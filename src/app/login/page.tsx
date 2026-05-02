@@ -21,119 +21,7 @@ import {
   X,
 } from "lucide-react";
 const MASTER_WALLET = "0x1cb90a414ade635dcfa78e41a825c789edde4d8e";
-function RolePickerPopup({
-  userId,
-  walletAddress,
-  onPick,
-}: {
-  userId: string;
-  walletAddress: string;
-  onPick: (role: string) => void;
-}) {
-  const [picking, setPicking] = useState<string | null>(null);
-  const roles = [
-    {
-      value: "admin",
-      label: "LSP Admin",
-      description: "Kelola skema, mint sertifikat, review assessment",
-      icon: "🛡️",
-      gradient: "from-violet-500 to-indigo-600",
-      border: "border-violet-200 hover:border-violet-400",
-      badge: "bg-violet-100 text-violet-700",
-    },
-    {
-      value: "assessor",
-      label: "Asesor",
-      description: "Evaluasi peserta, input nilai, upload portofolio",
-      icon: "📋",
-      gradient: "from-blue-500 to-cyan-600",
-      border: "border-blue-200 hover:border-blue-400",
-      badge: "bg-blue-100 text-blue-700",
-    },
-    {
-      value: "participant",
-      label: "Peserta",
-      description: "Daftar assessment, lihat sertifikat, cek status",
-      icon: "🎓",
-      gradient: "from-emerald-500 to-teal-600",
-      border: "border-emerald-200 hover:border-emerald-400",
-      badge: "bg-emerald-100 text-emerald-700",
-    },
-  ];
-  const handleSelect = async (role: string) => {
-    setPicking(role);
-    try {
-      const res = await fetch("/api/profile/update-role", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, role }),
-      });
-      if (!res.ok) throw new Error("Gagal update role");
-      toast.success(
-        `Masuk sebagai ${role === "admin" ? "LSP Admin" : role === "assessor" ? "Asesor" : "Peserta"}`,
-      );
-      onPick(role);
-    } catch {
-      toast.error("Gagal mengubah role");
-      setPicking(null);
-    }
-  };
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-in zoom-in-95 duration-200 overflow-hidden">
-        <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-6">
-          <div className="flex items-center gap-3 mb-1">
-            <div className="w-8 h-8 rounded-lg bg-yellow-400 flex items-center justify-center text-slate-900 font-bold text-sm">
-              👑
-            </div>
-            <h2 className="text-xl font-bold text-white">Master Wallet</h2>
-          </div>
-          <p className="text-slate-400 text-sm">
-            Pilih mode akses untuk sesi ini
-          </p>
-          <div className="mt-3 flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg">
-            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-            <span className="font-mono text-xs text-slate-300 truncate">
-              {walletAddress}
-            </span>
-          </div>
-        </div>
-        <div className="p-5 space-y-3">
-          {roles.map((r) => (
-            <button
-              key={r.value}
-              disabled={picking !== null}
-              onClick={() => handleSelect(r.value)}
-              className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-left ${picking === r.value ? "border-slate-300 bg-slate-50" : r.border + " bg-white hover:shadow-md"}`}
-            >
-              <div
-                className={`w-12 h-12 rounded-xl bg-gradient-to-br ${r.gradient} flex items-center justify-center text-xl flex-shrink-0 shadow-md`}
-              >
-                {picking === r.value ? (
-                  <Loader2 className="w-5 h-5 text-white animate-spin" />
-                ) : (
-                  r.icon
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="font-bold text-slate-800">{r.label}</p>
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full font-medium ${r.badge}`}
-                  >
-                    {r.value}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5">{r.description}</p>
-              </div>
-              <ChevronRight className="w-5 h-5 text-slate-300 flex-shrink-0" />
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
+
 function RegisterPopup({
   walletAddress,
   userId,
@@ -150,7 +38,7 @@ function RegisterPopup({
     email: "",
     phone: "",
     nik: "",
-    roleType: "participant",
+    roleType: walletAddress === MASTER_WALLET ? "admin" : "participant",
   });
   const [saving, setSaving] = useState(false);
   const handleSubmit = async (e: React.FormEvent) => {
@@ -284,34 +172,35 @@ function RegisterPopup({
                 </div>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold text-slate-600">
-                Daftar sebagai
-              </Label>
-              <RadioGroup
-                value={form.roleType}
-                onValueChange={(v) => setForm((f) => ({ ...f, roleType: v }))}
-                className="grid grid-cols-2 gap-2"
-              >
-                {[
-                  { value: "participant", label: "Peserta" },
-                  { value: "assessor", label: "Asesor" },
-                ].map((r) => (
-                  <div
-                    key={r.value}
-                    className={`flex items-center gap-2 p-3 border rounded-xl cursor-pointer transition-all ${form.roleType === r.value ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:bg-slate-50"}`}
-                  >
-                    <RadioGroupItem value={r.value} id={`r-${r.value}`} />
-                    <Label
-                      htmlFor={`r-${r.value}`}
-                      className="cursor-pointer text-sm font-medium"
+            {walletAddress !== MASTER_WALLET && (
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-slate-600">
+                  Daftar sebagai
+                </Label>
+                <RadioGroup
+                  value={form.roleType}
+                  onValueChange={(v) => setForm((f) => ({ ...f, roleType: v }))}
+                  className="grid grid-cols-2 gap-2"
+                >
+                  {[
+                    { value: "participant", label: "Peserta" },
+                  ].map((r) => (
+                    <div
+                      key={r.value}
+                      className={`flex items-center gap-2 p-3 border rounded-xl cursor-pointer transition-all ${form.roleType === r.value ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:bg-slate-50"}`}
                     >
-                      {r.label}
-                    </Label>
-                  </div>
-                ))}
-              </RadioGroup>
-            </div>
+                      <RadioGroupItem value={r.value} id={`r-${r.value}`} />
+                      <Label
+                        htmlFor={`r-${r.value}`}
+                        className="cursor-pointer text-sm font-medium"
+                      >
+                        {r.label}
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
+            )}
             {form.roleType === "participant" && (
               <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1">
                 <Label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
@@ -361,15 +250,13 @@ function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showRegister, setShowRegister] = useState(false);
-  const [showRolePicker, setShowRolePicker] = useState(false);
   const [pendingUserId, setPendingUserId] = useState("");
   useEffect(() => {
     const register = searchParams.get("register");
     const userId = searchParams.get("userId");
     if (register === "1" && userId && walletAddress) {
       setPendingUserId(userId);
-      if (walletAddress === MASTER_WALLET) setShowRolePicker(true);
-      else setShowRegister(true);
+      setShowRegister(true);
     }
   }, [searchParams, walletAddress]);
   const redirectByRole = (role: string) => {
@@ -502,16 +389,6 @@ function LoginContent() {
             redirectByRole(role);
           }}
           onClose={() => setShowRegister(false)}
-        />
-      )}
-      {showRolePicker && walletAddress && (
-        <RolePickerPopup
-          walletAddress={walletAddress}
-          userId={pendingUserId}
-          onPick={(role) => {
-            setShowRolePicker(false);
-            redirectByRole(role);
-          }}
         />
       )}
     </div>

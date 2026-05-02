@@ -122,25 +122,46 @@ function VerifyPageInner() {
     setState("loading");
     setResult(null);
     setImageUrl("");
-    // --- SKY SCRIPSI: VERIFICATION TIME ANALYSIS ---
+    
     const totalStartTime = performance.now();
     let bcTime = 0;
     let ipfsTime = 0;
     try {
-      const { data, error } = await supabase
+      
+      let data: any = null;
+      let error: any = null;
+
+      
+      const directRes = await supabase
         .from("certificates")
         .select(
-          `
-          *,
-          competency_schemes(name, criteria),
-          assessments(
-            id, recommendation, score,
-            profiles!participant_id(full_name, nik, wallet_address)
-          )
-        `,
+          `*, competency_schemes(name, criteria),
+          assessments(id, recommendation, score,
+            profiles!participant_id(full_name, nik, wallet_address))`,
         )
         .or(`certificate_number.eq.${trimmed},token_id.eq.${trimmed}`)
         .maybeSingle();
+
+      if (directRes.data) {
+        data = directRes.data;
+        error = directRes.error;
+      } else if (trimmed.startsWith("0x")) {
+        
+        const walletRes = await supabase
+          .from("certificates")
+          .select(
+            `*, competency_schemes(name, criteria),
+            assessments(id, recommendation, score,
+              profiles!participant_id(full_name, nik, wallet_address))`,
+          )
+          .ilike("participant_wallet", trimmed)
+          .limit(1)
+          .maybeSingle();
+        data = walletRes.data;
+        error = walletRes.error;
+      } else {
+        error = directRes.error;
+      }
       if (error || !data || !data.token_id) {
         setState("not_found");
         return;
@@ -251,7 +272,7 @@ function VerifyPageInner() {
                 <Input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Nomor Sertifikat atau Token ID..."
+                  placeholder="Nomor Sertifikat, Token ID, atau Wallet (0x...)..."
                   className="h-14 pl-12 pr-4 text-base bg-slate-50 border-slate-200 focus:border-blue-400 rounded-xl"
                 />
               </div>
@@ -506,6 +527,18 @@ function VerifyPageInner() {
                       <Printer className="w-4 h-4" /> Cetak PDF
                     </Button>
                   </div>
+                  {result.participant_wallet && (
+                    <a
+                      href={`/p/${result.participant_wallet}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="print:hidden"
+                    >
+                      <Button variant="outline" className="w-full gap-2 border-slate-200 text-slate-600">
+                        <User className="w-4 h-4" /> Lihat Semua Sertifikat Pemilik
+                      </Button>
+                    </a>
+                  )}
                 </div>
               </div>
             </div>

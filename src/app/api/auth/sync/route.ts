@@ -18,14 +18,15 @@ function getAdmin() {
 }
 export async function POST(req: NextRequest) {
   try {
-    const { walletAddress } = await req.json();
+    const body = await req.json();
+    const { walletAddress, fullName, email: bodyEmail, phone, role: bodyRole } = body;
     if (!walletAddress)
       return NextResponse.json(
         { error: "walletAddress required" },
         { status: 400 },
       );
     const addr = walletAddress.toLowerCase();
-    const email = `${addr}@wallet.KOMPETEN.ID.local`;
+    const syntheticEmail = `${addr}@wallet.KOMPETEN.ID.local`;
     const supabaseAdmin = getAdmin();
     let { data: existing } = (await supabaseAdmin
       .from("profiles")
@@ -37,10 +38,19 @@ export async function POST(req: NextRequest) {
     if (existing) {
       userId = existing.id;
       role = existing.role ?? "participant";
+      if (bodyRole || fullName || bodyEmail || phone) {
+        const updatePayload: any = {};
+        if (bodyRole) updatePayload.role = bodyRole;
+        if (fullName) updatePayload.full_name = fullName;
+        if (bodyEmail) updatePayload.email = bodyEmail;
+        if (phone) updatePayload.phone = phone;
+        await (supabaseAdmin.from("profiles") as any).update(updatePayload).eq("id", userId);
+        if (bodyRole) role = bodyRole;
+      }
     } else {
       const { data: newUser, error: createErr } =
         await supabaseAdmin.auth.admin.createUser({
-          email,
+          email: syntheticEmail,
           password: `${addr}-KOMPETEN.ID-salt`,
           email_confirm: true,
           user_metadata: { wallet_address: addr },
@@ -51,9 +61,17 @@ export async function POST(req: NextRequest) {
           { status: 500 },
         );
       userId = newUser.user.id;
-      role = addr === MASTER_WALLET ? "admin" : "participant";
-      existing = { id: userId, wallet_address: addr, role };
-      await (supabaseAdmin.from("profiles") as any).upsert(existing, {
+      role = bodyRole ?? (addr === MASTER_WALLET ? "admin" : "participant");
+      const profilePayload: any = {
+        id: userId,
+        wallet_address: addr,
+        role,
+      };
+      if (fullName) profilePayload.full_name = fullName;
+      if (bodyEmail) profilePayload.email = bodyEmail;
+      if (phone) profilePayload.phone = phone;
+      existing = profilePayload;
+      await (supabaseAdmin.from("profiles") as any).upsert(profilePayload, {
         onConflict: "id",
       });
     }

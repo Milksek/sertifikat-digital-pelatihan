@@ -5,11 +5,10 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useActiveAccount } from "thirdweb/react";
 import { toast } from "sonner";
-import { Shield, Loader2 } from "lucide-react";
+import { Shield, Loader2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Card,
   CardContent,
@@ -26,8 +25,6 @@ export default function RegisterPage() {
     phone: "",
     nik: "",
     institution: "",
-    roleType: "participant",
-    referenceCode: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   useEffect(() => {
@@ -45,9 +42,7 @@ export default function RegisterPage() {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
-  const handleRoleChange = (value: string) => {
-    setFormData((prev) => ({ ...prev, roleType: value, referenceCode: "" }));
-  };
+  const handleRoleChange = (_value: string) => {}; 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -55,15 +50,8 @@ export default function RegisterPage() {
       toast.error("Harap isi semua kolom wajib");
       return;
     }
-    if (formData.roleType === "participant" && formData.nik.length !== 16) {
+    if (formData.nik.length !== 16) {
       toast.error("NIK harus terdiri dari 16 digit");
-      return;
-    }
-    if (
-      formData.roleType === "assessor" &&
-      formData.referenceCode !== "ASSR-VALID"
-    ) {
-      toast.error("Kode referensi asesor tidak valid");
       return;
     }
     try {
@@ -75,18 +63,15 @@ export default function RegisterPage() {
           email: formData.email,
           phone: formData.phone,
           nik: formData.nik,
-          role: formData.roleType,
+          role: "participant",
         })
         .eq("id", user.id);
       if (error) throw error;
       toast.success("Registrasi berhasil!");
-      window.location.href =
-        formData.roleType === "assessor"
-          ? "/assessor/dashboard"
-          : "/participant/dashboard";
+      window.location.href = "/participant/dashboard";
     } catch (error: unknown) {
       console.error(error);
-      toast.error(error.message || "Gagal menyimpan data profil");
+      toast.error((error as any).message || "Gagal menyimpan data profil");
     } finally {
       setIsSubmitting(false);
     }
@@ -105,15 +90,15 @@ export default function RegisterPage() {
       <Card className="w-full max-w-lg relative z-10 shadow-xl border-0 bg-white/90 backdrop-blur-xl">
         <CardHeader className="text-center space-y-4 pt-8">
           <div className="mx-auto w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600">
-            <Shield className="w-6 h-6" />
+            <User className="w-6 h-6" />
           </div>
           <div>
             <CardTitle className="text-2xl font-bold tracking-tight text-slate-900">
               Lengkapi Profil Anda
             </CardTitle>
             <CardDescription className="text-base mt-2">
-              Wallet Anda belum terdaftar. Silakan lengkapi data diri Anda untuk
-              melanjutkan.
+              Wallet Anda terdeteksi sebagai akun baru. Lengkapi data diri untuk
+              mendaftar sebagai <strong>peserta</strong>.
             </CardDescription>
           </div>
         </CardHeader>
@@ -163,63 +148,22 @@ export default function RegisterPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>
-                  Pilih Peran <span className="text-red-500">*</span>
+                <Label htmlFor="nik">
+                  NIK KTP <span className="text-red-500">*</span>
                 </Label>
-                <RadioGroup
-                  value={formData.roleType}
-                  onValueChange={handleRoleChange}
-                  className="flex space-x-4 mt-2"
-                >
-                  <div className="flex items-center space-x-2 border rounded-lg p-3 flex-1 cursor-pointer hover:bg-slate-50">
-                    <RadioGroupItem value="participant" id="r-participant" />
-                    <Label htmlFor="r-participant" className="cursor-pointer">
-                      Peserta
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2 border rounded-lg p-3 flex-1 cursor-pointer hover:bg-slate-50">
-                    <RadioGroupItem value="assessor" id="r-assessor" />
-                    <Label htmlFor="r-assessor" className="cursor-pointer">
-                      Asesor
-                    </Label>
-                  </div>
-                </RadioGroup>
+                <Input
+                  id="nik"
+                  name="nik"
+                  placeholder="Masukkan 16 digit NIK"
+                  maxLength={16}
+                  value={formData.nik}
+                  onChange={handleChange}
+                  required
+                />
+                <p className="text-xs text-slate-500">
+                  NIK wajib diisi untuk penerbitan sertifikat.
+                </p>
               </div>
-              {formData.roleType === "participant" && (
-                <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                  <Label htmlFor="nik">
-                    NIK KTP <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="nik"
-                    name="nik"
-                    placeholder="Masukkan 16 digit NIK"
-                    maxLength={16}
-                    value={formData.nik}
-                    onChange={handleChange}
-                    required
-                  />
-                  <p className="text-xs text-slate-500">
-                    NIK wajib diisi untuk penerbitan sertifikat negara.
-                  </p>
-                </div>
-              )}
-              {formData.roleType === "assessor" && (
-                <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                  <Label htmlFor="referenceCode">
-                    Kode Referensi Asesor{" "}
-                    <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="referenceCode"
-                    name="referenceCode"
-                    placeholder="Masukkan kode undangan (contoh: ASSR-VALID)"
-                    value={formData.referenceCode}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-              )}
               <div className="space-y-2">
                 <Label htmlFor="institution">
                   Institusi / Organisasi (Opsional)

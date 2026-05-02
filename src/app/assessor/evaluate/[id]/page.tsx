@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ui/error-state";
+import { DetailPageSkeleton } from "@/components/ui/page-skeleton";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -23,6 +25,8 @@ import {
   PenLine,
   AlertCircle,
   FileUp,
+  FileText,
+  Link as LinkIcon,
 } from "lucide-react";
 const RECOMMENDATIONS = [
   {
@@ -33,15 +37,7 @@ const RECOMMENDATIONS = [
     color: "border-emerald-400 bg-emerald-50 text-emerald-800",
     activeColor: "border-emerald-500 bg-emerald-100 ring-2 ring-emerald-400",
     iconColor: "text-emerald-600",
-  },
-  {
-    value: "Belum Kompeten",
-    label: "Belum Kompeten",
-    desc: "Peserta belum memenuhi standar kompetensi",
-    icon: XCircle,
-    color: "border-red-300 bg-red-50 text-red-800",
-    activeColor: "border-red-500 bg-red-100 ring-2 ring-red-400",
-    iconColor: "text-red-500",
+    lockedColor: "border-slate-200 bg-slate-50 text-slate-400",
   },
   {
     value: "Perlu Remedial",
@@ -51,6 +47,17 @@ const RECOMMENDATIONS = [
     color: "border-yellow-300 bg-yellow-50 text-yellow-800",
     activeColor: "border-yellow-500 bg-yellow-100 ring-2 ring-yellow-400",
     iconColor: "text-yellow-600",
+    lockedColor: "border-slate-200 bg-slate-50 text-slate-400",
+  },
+  {
+    value: "Belum Kompeten",
+    label: "Belum Kompeten",
+    desc: "Peserta belum memenuhi standar kompetensi",
+    icon: XCircle,
+    color: "border-red-300 bg-red-50 text-red-800",
+    activeColor: "border-red-500 bg-red-100 ring-2 ring-red-400",
+    iconColor: "text-red-500",
+    lockedColor: "border-slate-200 bg-slate-50 text-slate-400",
   },
 ];
 export default function EvaluatePage() {
@@ -58,13 +65,15 @@ export default function EvaluatePage() {
   const router = useRouter();
   const { user } = useAuth();
   const account = useActiveAccount();
-  const [assessment, setAssessment] = useState<unknown>(null);
+  const [assessment, setAssessment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [teori, setTeori] = useState<number | "">("");
   const [praktik, setPraktik] = useState<number | "">("");
+  const [wawancara, setWawancara] = useState<number | "">("");
   const [recommendation, setRecommendation] = useState<string>("Kompeten");
   const [notes, setNotes] = useState<string>("");
+
   useEffect(() => {
     async function fetchAssessment() {
       const { data } = await supabase
@@ -79,6 +88,7 @@ export default function EvaluatePage() {
         if (data.score) {
           setTeori(data.score.teori ?? "");
           setPraktik(data.score.praktik ?? "");
+          setWawancara(data.score.wawancara ?? "");
         }
         if (data.recommendation) {
           const rec = data.recommendation.split(" - ")[0];
@@ -96,19 +106,16 @@ export default function EvaluatePage() {
       toast.error("Harap hubungkan wallet untuk menandatangani evaluasi");
       return;
     }
-    if (teori === "" || praktik === "") {
-      toast.error("Nilai Teori dan Praktik harus diisi");
-      return;
-    }
-    if (!notes.trim()) {
-      toast.error("Catatan asesor harus diisi");
+    if (teori === "" || praktik === "" || wawancara === "") {
+      toast.error("Nilai Teori, Praktik, dan Wawancara harus diisi");
       return;
     }
     try {
       setSubmitting(true);
+
       const evalData = JSON.stringify({
         assessmentId: id,
-        scores: { teori, praktik },
+        scores: { teori, praktik, wawancara },
         recommendation,
         notes,
         assessorId: user?.id,
@@ -118,8 +125,8 @@ export default function EvaluatePage() {
       const { error } = await supabase
         .from("assessments")
         .update({
-          score: { teori, praktik },
-          recommendation: `${recommendation} - ${notes}`,
+          score: { teori, praktik, wawancara },
+          recommendation: notes.trim() ? `${recommendation} - ${notes}` : recommendation,
           signature,
           assessor_id: user?.id,
           status: "evaluated",
@@ -128,34 +135,43 @@ export default function EvaluatePage() {
         .eq("id", id);
       if (error) throw error;
       toast.success("Evaluasi berhasil dikirim dan ditandatangani!");
-      router.push("/assessor/evaluations");
-    } catch (error: unknown) {
+      router.push("/assessor/completed");
+    } catch (error: any) {
       toast.error(error.message || "Gagal mengirim evaluasi");
     } finally {
       setSubmitting(false);
     }
   };
-  if (loading) {
-    return (
-      <div className="max-w-3xl mx-auto space-y-6">
-        <Skeleton className="h-10 w-1/3" />
-        <Skeleton className="h-40 w-full rounded-xl" />
-        <Skeleton className="h-80 w-full rounded-xl" />
-      </div>
-    );
-  }
+
+  const teoriNum = Number(teori) || 0;
+  const praktikNum = Number(praktik) || 0;
+  const wawancaraNum = Number(wawancara) || 0;
+  const avgScore =
+    teori !== "" && praktik !== "" && wawancara !== ""
+      ? Number(((teoriNum + praktikNum + wawancaraNum) / 3).toFixed(2))
+      : null;
+
+  useEffect(() => {
+    const isAlreadyDone =
+      assessment?.status === "evaluated" ||
+      assessment?.status === "approved" ||
+      assessment?.status === "rejected";
+    if (isAlreadyDone || avgScore === null) return;
+    if (avgScore >= 75) setRecommendation("Kompeten");
+    else if (avgScore >= 60) setRecommendation("Perlu Remedial");
+    else setRecommendation("Belum Kompeten");
+  }, [avgScore]);
+
+  if (loading) return <DetailPageSkeleton sections={5} />;
   if (!assessment) {
     return (
-      <div className="max-w-3xl mx-auto flex flex-col items-center justify-center py-20 gap-4">
-        <AlertCircle className="w-12 h-12 text-slate-300" />
-        <p className="text-slate-600">Penilaian tidak ditemukan.</p>
-        <Button
-          variant="outline"
-          onClick={() => router.push("/assessor/evaluations")}
-        >
-          Kembali ke Daftar
-        </Button>
-      </div>
+      <ErrorState
+        variant="not-found"
+        title="Penilaian Tidak Ditemukan"
+        description="Data penilaian tidak ada atau sudah dihapus."
+        backHref="/assessor/evaluations"
+        backLabel="Kembali ke Daftar"
+      />
     );
   }
   const isCompleted =
@@ -165,12 +181,15 @@ export default function EvaluatePage() {
   const criteriaList = Array.isArray(assessment.competency_schemes?.criteria)
     ? assessment.competency_schemes.criteria
     : [];
-  const teoriNum = Number(teori) || 0;
-  const praktikNum = Number(praktik) || 0;
-  const avgScore =
-    teori !== "" && praktik !== ""
-      ? Math.round((teoriNum + praktikNum) / 2)
-      : null;
+
+  const isRecAllowed = (recValue: string, avg: number | null): boolean => {
+    if (avg === null) return true;
+    if (avg >= 75) return recValue === "Kompeten";
+    if (avg >= 60)
+      return recValue === "Kompeten" || recValue === "Perlu Remedial";
+    return recValue === "Belum Kompeten";
+  };
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
@@ -254,6 +273,31 @@ export default function EvaluatePage() {
               </div>
             </div>
           )}
+          {(assessment as any).portfolio_files &&
+            (assessment as any).portfolio_files.length > 0 && (
+              <div className="border-t border-slate-100 p-4">
+                <Label className="text-xs text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                  <FileText className="w-3.5 h-3.5" /> Portofolio / Dokumen
+                  Bukti ({(assessment as any).portfolio_files.length})
+                </Label>
+                <div className="flex flex-col gap-2">
+                  {(assessment as any).portfolio_files.map(
+                    (fileUrl: string, idx: number) => (
+                      <a
+                        key={idx}
+                        href={fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1.5"
+                      >
+                        <LinkIcon className="w-3.5 h-3.5" /> Dokumen Portofolio{" "}
+                        {idx + 1}
+                      </a>
+                    ),
+                  )}
+                </div>
+              </div>
+            )}
         </CardContent>
       </Card>
       <Card className="border-slate-200">
@@ -263,23 +307,23 @@ export default function EvaluatePage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div className="space-y-2">
               <Label className="text-sm font-medium text-slate-700">
                 Nilai Teori{" "}
                 <span className="text-slate-400 font-normal">(0 – 100)</span>
               </Label>
               <p className="text-xs text-slate-400">
-                Evaluasi pemahaman konsep dan teori kompetensi.
+                Pemahaman konsep dan teori kompetensi.
               </p>
               <Input
-                type="number"
-                min={0}
-                max={100}
+                type="text"
+                inputMode="numeric"
                 value={teori}
                 onChange={(e) => {
-                  const v = parseInt(e.target.value);
-                  setTeori(isNaN(v) ? "" : Math.min(100, Math.max(0, v)));
+                  const raw = e.target.value.replace(/[^0-9]/g, "");
+                  const v = parseInt(raw, 10);
+                  setTeori(raw === "" ? "" : Math.min(100, Math.max(0, v)));
                 }}
                 disabled={isCompleted}
                 placeholder="0 – 100"
@@ -292,16 +336,38 @@ export default function EvaluatePage() {
                 <span className="text-slate-400 font-normal">(0 – 100)</span>
               </Label>
               <p className="text-xs text-slate-400">
-                Evaluasi demonstrasi keterampilan langsung.
+                Demonstrasi keterampilan langsung.
               </p>
               <Input
-                type="number"
-                min={0}
-                max={100}
+                type="text"
+                inputMode="numeric"
                 value={praktik}
                 onChange={(e) => {
-                  const v = parseInt(e.target.value);
-                  setPraktik(isNaN(v) ? "" : Math.min(100, Math.max(0, v)));
+                  const raw = e.target.value.replace(/[^0-9]/g, "");
+                  const v = parseInt(raw, 10);
+                  setPraktik(raw === "" ? "" : Math.min(100, Math.max(0, v)));
+                }}
+                disabled={isCompleted}
+                placeholder="0 – 100"
+                className="text-lg font-bold text-center h-12"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-slate-700">
+                Nilai Wawancara{" "}
+                <span className="text-slate-400 font-normal">(0 – 100)</span>
+              </Label>
+              <p className="text-xs text-slate-400">
+                Evaluasi pendalaman secara lisan.
+              </p>
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={wawancara}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/[^0-9]/g, "");
+                  const v = parseInt(raw, 10);
+                  setWawancara(raw === "" ? "" : Math.min(100, Math.max(0, v)));
                 }}
                 disabled={isCompleted}
                 placeholder="0 – 100"
@@ -325,25 +391,7 @@ export default function EvaluatePage() {
               </span>
             </div>
           )}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
-              <FileUp className="w-4 h-4 text-slate-400" /> Portofolio Pendukung
-              <span className="text-slate-400 font-normal">(Opsional)</span>
-            </Label>
-            <p className="text-xs text-slate-400">
-              Upload dokumen pendukung peserta (PDF/Gambar). Fitur upload segera
-              hadir.
-            </p>
-            <div className="border-2 border-dashed border-slate-200 rounded-lg p-4 text-center text-sm text-slate-400 bg-slate-50">
-              <FileUp className="w-6 h-6 mx-auto mb-2 text-slate-300" />
-              Drag & drop atau klik untuk upload
-              <Input
-                type="file"
-                disabled={isCompleted}
-                className="mt-2 cursor-pointer"
-              />
-            </div>
-          </div>
+
           <div className="space-y-2">
             <Label className="text-sm font-medium text-slate-700">
               Catatan Asesor
@@ -367,15 +415,34 @@ export default function EvaluatePage() {
               {RECOMMENDATIONS.map((rec) => {
                 const Icon = rec.icon;
                 const isSelected = recommendation === rec.value;
+                const isAllowed = isRecAllowed(rec.value, avgScore);
+                const isLocked = isCompleted || !isAllowed;
                 return (
                   <button
                     key={rec.value}
                     type="button"
-                    disabled={isCompleted}
-                    onClick={() => setRecommendation(rec.value)}
+                    disabled={isLocked}
+                    onClick={() => !isLocked && setRecommendation(rec.value)}
+                    title={
+                      !isAllowed && avgScore !== null
+                        ? avgScore >= 75
+                          ? "Nilai sudah aman (≥75), hanya Kompeten yang dapat dipilih."
+                          : avgScore >= 60
+                            ? "Nilai pas-pasan (60–74), hanya Perlu Remedial yang dapat dipilih."
+                            : "Nilai di bawah standar (<60), hanya Belum Kompeten yang dapat dipilih."
+                        : undefined
+                    }
                     className={`flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all ${
-                      isSelected ? rec.activeColor : rec.color
-                    } ${isCompleted ? "opacity-60 cursor-not-allowed" : "cursor-pointer hover:shadow-sm"}`}
+                      isLocked && !isCompleted
+                        ? rec.lockedColor + " opacity-40 cursor-not-allowed"
+                        : isSelected
+                          ? rec.activeColor
+                          : rec.color
+                    } ${isCompleted ? "opacity-60 cursor-not-allowed" : ""} ${
+                      !isLocked && !isCompleted
+                        ? "cursor-pointer hover:shadow-sm"
+                        : ""
+                    }`}
                   >
                     <div
                       className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${isSelected ? "border-current" : "border-current/40"}`}
@@ -385,11 +452,20 @@ export default function EvaluatePage() {
                       )}
                     </div>
                     <Icon
-                      className={`w-5 h-5 flex-shrink-0 ${rec.iconColor}`}
+                      className={`w-5 h-5 flex-shrink-0 ${
+                        isLocked && !isCompleted
+                          ? "text-slate-300"
+                          : rec.iconColor
+                      }`}
                     />
                     <div>
                       <p className="font-semibold text-sm">{rec.label}</p>
                       <p className="text-xs opacity-70 mt-0.5">{rec.desc}</p>
+                      {!isAllowed && avgScore !== null && !isCompleted && (
+                        <p className="text-xs text-slate-900 mt-1 italic">
+                          Tidak tersedia untuk nilai ini
+                        </p>
+                      )}
                     </div>
                   </button>
                 );

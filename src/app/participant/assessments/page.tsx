@@ -14,21 +14,13 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   FileCheck,
   CheckCircle2,
   XCircle,
   Clock,
-  User,
-  BookOpen,
-  Calendar,
   ClipboardList,
   ArrowRight,
+  Eye,
 } from "lucide-react";
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
@@ -41,9 +33,7 @@ export default function ParticipantAssessments() {
     globalAssessmentsCache[cacheKey] || [],
   );
   const [loading, setLoading] = useState(!globalAssessmentsCache[cacheKey]);
-  const [selectedAssessment, setSelectedAssessment] = useState<any | null>(
-    null,
-  );
+
   useEffect(() => {
     async function fetchAssessments() {
       if (!user) {
@@ -230,10 +220,6 @@ export default function ParticipantAssessments() {
                   <TableCell className="font-medium text-slate-900">
                     {a.competency_schemes?.name}
                   </TableCell>
-                  <TableCell className="text-xs text-slate-400 font-normal">
-                    {a.competency_schemes?.criteria?.kode ||
-                      `SKKNI-${a.id.slice(0, 8).toUpperCase()}`}
-                  </TableCell>
                   <TableCell className="text-slate-600">
                     {format(new Date(a.created_at), "dd MMM yyyy", {
                       locale: idLocale,
@@ -242,14 +228,15 @@ export default function ParticipantAssessments() {
                   <TableCell>{getStatusBadge(a.status)}</TableCell>
                   <TableCell>{getResultBadge(a.status)}</TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-slate-200 hover:bg-slate-100"
-                      onClick={() => setSelectedAssessment(a)}
-                    >
-                      Detail
-                    </Button>
+                    <Link href={`/participant/assessments/${a.id}`}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-slate-200 hover:bg-slate-100 gap-1.5"
+                      >
+                        <Eye className="w-3.5 h-3.5" /> Lihat Detail
+                      </Button>
+                    </Link>
                   </TableCell>
                 </TableRow>
               ))
@@ -257,120 +244,7 @@ export default function ParticipantAssessments() {
           </TableBody>
         </Table>
       </div>
-      <Dialog
-        open={!!selectedAssessment}
-        onOpenChange={() => setSelectedAssessment(null)}
-      >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ClipboardList className="w-5 h-5 text-blue-600" />
-              Detail Assessment
-            </DialogTitle>
-          </DialogHeader>
-          {selectedAssessment && (
-            <div className="space-y-5 pt-1">
-              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                <div className="flex-1">
-                  <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">
-                    Status
-                  </p>
-                  {getStatusBadge(selectedAssessment.status)}
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">
-                    Hasil
-                  </p>
-                  {getResultBadge(selectedAssessment.status)}
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
-                  <BookOpen className="w-4 h-4 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 font-medium mb-0.5">
-                    Skema Kompetensi
-                  </p>
-                  <p className="text-sm font-semibold text-slate-800">
-                    {selectedAssessment.competency_schemes?.name}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center flex-shrink-0">
-                  <User className="w-4 h-4 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 font-medium mb-0.5">
-                    Asesor
-                  </p>
-                  <p className="text-sm font-semibold text-slate-800">
-                    {selectedAssessment.assessor?.full_name || (
-                      <span className="text-slate-400 font-normal italic">
-                        Belum ditugaskan
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center flex-shrink-0">
-                  <Calendar className="w-4 h-4 text-emerald-600" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 font-medium mb-0.5">
-                    Tanggal
-                  </p>
-                  <p className="text-sm text-slate-700">
-                    <span className="font-medium">Daftar:</span>{" "}
-                    {format(
-                      new Date(selectedAssessment.created_at),
-                      "dd MMMM yyyy",
-                      { locale: idLocale },
-                    )}
-                  </p>
-                  {selectedAssessment.evaluated_at && (
-                    <p className="text-sm text-slate-700">
-                      <span className="font-medium">Dievaluasi:</span>{" "}
-                      {format(
-                        new Date(selectedAssessment.evaluated_at),
-                        "dd MMMM yyyy",
-                        { locale: idLocale },
-                      )}
-                    </p>
-                  )}
-                </div>
-              </div>
-              {getScoreTotal(selectedAssessment.score) && (
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-yellow-50 flex items-center justify-center flex-shrink-0">
-                    <CheckCircle2 className="w-4 h-4 text-yellow-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 font-medium mb-0.5">
-                      Total Skor
-                    </p>
-                    <p className="text-sm font-bold text-slate-800 text-lg">
-                      {getScoreTotal(selectedAssessment.score)}
-                    </p>
-                  </div>
-                </div>
-              )}
-              {selectedAssessment.recommendation && (
-                <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
-                  <p className="text-xs text-blue-600 font-semibold uppercase tracking-wider mb-1">
-                    Rekomendasi Asesor
-                  </p>
-                  <p className="text-sm text-slate-700 leading-relaxed">
-                    {selectedAssessment.recommendation}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+
     </div>
   );
 }

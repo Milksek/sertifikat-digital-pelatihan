@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TablePageSkeleton } from "@/components/ui/page-skeleton";
 import {
   Search,
   User,
@@ -84,14 +85,7 @@ export default function AdminParticipants() {
         (p.email || "").toLowerCase().includes(lower),
     );
   }, [search, participants]);
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-1/4" />
-        <Skeleton className="h-[500px] w-full rounded-xl" />
-      </div>
-    );
-  }
+  if (loading) return <TablePageSkeleton rows={6} cols={5} />;
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { createClient } from "@supabase/supabase-js";
 import {
   Shield,
   Award,
@@ -8,7 +9,29 @@ import {
   UserCheck,
   Activity,
 } from "lucide-react";
-export default function LandingPage() {
+
+async function getLiveStats() {
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const [certRes, participantRes, schemeRes] = await Promise.all([
+      supabase.from("certificates").select("*", { count: "exact", head: true }),
+      supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "participant"),
+      supabase.from("competency_schemes").select("*", { count: "exact", head: true }).eq("status", "active"),
+    ]);
+    return {
+      certificates: certRes.count ?? 0,
+      participants: participantRes.count ?? 0,
+      schemes: schemeRes.count ?? 0,
+    };
+  } catch {
+    return { certificates: 0, participants: 0, schemes: 0 };
+  }
+}
+export default async function LandingPage() {
+  const stats = await getLiveStats();
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       <header className="px-6 py-4 flex items-center justify-between border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-50">
@@ -84,7 +107,7 @@ export default function LandingPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center divide-y md:divide-y-0 md:divide-x divide-slate-100">
               <div className="py-4">
                 <div className="text-4xl font-bold text-slate-900 mb-2">
-                  1,250+
+                  {stats.certificates.toLocaleString("id-ID")}+
                 </div>
                 <div className="text-sm font-medium text-slate-500 uppercase tracking-wider">
                   Sertifikat Terbit
@@ -92,16 +115,16 @@ export default function LandingPage() {
               </div>
               <div className="py-4">
                 <div className="text-4xl font-bold text-slate-900 mb-2">
-                  850+
+                  {stats.participants.toLocaleString("id-ID")}+
                 </div>
                 <div className="text-sm font-medium text-slate-500 uppercase tracking-wider">
                   Peserta Tersertifikasi
                 </div>
               </div>
               <div className="py-4">
-                <div className="text-4xl font-bold text-slate-900 mb-2">24</div>
+                <div className="text-4xl font-bold text-slate-900 mb-2">{stats.schemes}</div>
                 <div className="text-sm font-medium text-slate-500 uppercase tracking-wider">
-                  Skema Kompetensi
+                  Skema Kompetensi Aktif
                 </div>
               </div>
             </div>

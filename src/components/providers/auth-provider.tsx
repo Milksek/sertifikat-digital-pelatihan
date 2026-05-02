@@ -87,7 +87,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (token) {
         try {
           const base64Url = token.split(".")[1];
-          const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+          let base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+          const pad = base64.length % 4;
+          if (pad) {
+            base64 += "=".repeat(4 - pad);
+          }
           const jsonPayload = decodeURIComponent(
             atob(base64)
               .split("")
@@ -109,14 +113,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               .select("*")
               .eq("id", userId)
               .maybeSingle();
+
             if (data && !error) {
               loadProfile(data as UserProfile);
               return;
-            } else if (error) {
-              console.error(
-                "Gagal sinkronisasi data profil dari Supabase:",
-                error,
-              );
+            } else {
               if (cachedProfile) {
                 setIsLoading(false);
                 return;
@@ -125,6 +126,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         } catch (e) {
           console.error("Session revalidation failed:", e);
+          if (cachedProfile) {
+            setIsLoading(false);
+            return;
+          }
         }
       }
       loadProfile(null);

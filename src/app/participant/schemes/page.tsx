@@ -21,6 +21,14 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   BookOpen,
   Loader2,
   Search,
@@ -30,6 +38,9 @@ import {
   Layers,
   GraduationCap,
   User,
+  UploadCloud,
+  FileText,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -48,6 +59,11 @@ export default function ParticipantSchemes() {
   const [loading, setLoading] = useState(!globalSchemesCache[cacheKey]);
   const [registering, setRegistering] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+
+  const [selectedScheme, setSelectedScheme] = useState<any>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
   useEffect(() => {
     async function fetchData() {
       if (!user) {
@@ -117,32 +133,95 @@ export default function ParticipantSchemes() {
         (s.description || "").toLowerCase().includes(search.toLowerCase()),
     );
   }, [schemes, search]);
-  const handleRegister = async (scheme: any) => {
-    if (!user) return;
+  const openRegisterModal = (scheme: any) => {
+    setSelectedScheme(scheme);
+    setFiles([]);
+  };
+
+  const handleFileValidation = (newFiles: File[]) => {
+    const validFiles = newFiles.filter((file) => {
+      if (file.type !== "application/pdf") {
+        toast.error(`${file.name} bukan PDF. Harap unggah PDF saja.`);
+        return false;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error(`${file.name} melebihi 5MB.`);
+        return false;
+      }
+      return true;
+    });
+
+    setFiles((prev) => {
+      const merged = [...prev, ...validFiles];
+      if (merged.length > 3) {
+        toast.error("Maksimal 3 file yang diizinkan.");
+        return merged.slice(0, 3);
+      }
+      return merged;
+    });
+  };
+
+  const removeFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const confirmRegistration = async () => {
+    if (!user || !selectedScheme) return;
     try {
-      setRegistering(scheme.id);
+      setRegistering(selectedScheme.id);
+      setUploading(true);
+
+      const uploadedUrls: string[] = [];
+      if (files.length > 0) {
+        for (const file of files) {
+          const fileExt = file.name.split(".").pop();
+          const fileName = `${user.id}-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+          const { error: uploadError } = await supabase.storage
+            .from("portfolios")
+            .upload(fileName, file);
+          if (uploadError)
+            throw new Error(
+              "Gagal mengunggah file portofolio: " + uploadError.message,
+            );
+
+          const { data: publicUrlData } = supabase.storage
+            .from("portfolios")
+            .getPublicUrl(fileName);
+          uploadedUrls.push(publicUrlData.publicUrl);
+        }
+      }
+
       const criteriaObj =
-        typeof scheme.criteria === "object" && !Array.isArray(scheme.criteria)
-          ? (scheme.criteria as Record<string, any>)
+        typeof selectedScheme.criteria === "object" && !Array.isArray(selectedScheme.criteria)
+          ? (selectedScheme.criteria as Record<string, any>)
           : null;
       const assessorIdToAssign = criteriaObj?.assessor_id || null;
+
+      const payload: any = {
+        participant_id: user.id,
+        scheme_id: selectedScheme.id,
+        assessor_id: assessorIdToAssign,
+        status: "pending",
+      };
+
+      if (uploadedUrls.length > 0) {
+        payload.portfolio_files = uploadedUrls;
+      }
+
       const { data, error } = await supabase
         .from("assessments")
-        .insert({
-          participant_id: user.id,
-          scheme_id: scheme.id,
-          assessor_id: assessorIdToAssign,
-          status: "pending",
-        })
+        .insert(payload)
         .select()
         .single();
       if (error) throw error;
       toast.success("Berhasil mendaftar uji kompetensi!");
-      setMyAssessments((prev) => ({ ...prev, [scheme.id]: data }));
+      setMyAssessments((prev) => ({ ...prev, [selectedScheme.id]: data }));
+      setSelectedScheme(null);
     } catch (e: any) {
       toast.error(e.message || "Gagal mendaftar uji kompetensi.");
     } finally {
       setRegistering(null);
+      setUploading(false);
     }
   };
   const getStatusBadge = (status: string) => {
@@ -382,7 +461,7 @@ export default function ParticipantSchemes() {
                   ) : (
                     <Button
                       className="w-full bg-blue-600 hover:bg-blue-700"
-                      onClick={() => handleRegister(scheme)}
+                      onClick={() => openRegisterModal(scheme)}
                       disabled={registering === scheme.id}
                     >
                       {registering === scheme.id ? (
@@ -401,6 +480,150 @@ export default function ParticipantSchemes() {
           })}
         </div>
       )}
+      
+      <Dialog open={!!selectedScheme} onOpenChange={(open) => {
+        if (!open && !uploading) setSelectedScheme(null);
+      }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Daftar Sertifikasi</DialogTitle>
+            <DialogDescription>
+              {selectedScheme?.name}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-4">
+            <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
+              <p className="text-sm text-blue-800">
+                Silakan unggah dokumen persyaratan atau portofolio (seperti Ijazah, CV, Sertifikat Pelatihan) sebagai bukti pendukung. Dokumen ini <strong>opsional</strong> kecuali diwajibkan oleh Asesor.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragOver(true);
+                }}
+                onDragLeave={() => setIsDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragOver(false);
+                  if (uploading) return;
+                  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    handleFileValidation(Array.from(e.dataTransfer.files));
+                  }
+                }}
+                onClick={() => {
+                  if (!uploading) document.getElementById("portfolio-register-input")?.click();
+                }}
+                className={`relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-200 ${
+                  isDragOver
+                    ? "border-blue-400 bg-blue-50 scale-[1.01]"
+                    : files.length > 0
+                      ? "border-slate-300 bg-slate-50"
+                      : "border-slate-200 hover:border-blue-300 hover:bg-slate-50"
+                } ${uploading ? "opacity-50 cursor-not-allowed" : ""}`}
+              >
+                <input
+                  id="portfolio-register-input"
+                  type="file"
+                  multiple
+                  accept="application/pdf"
+                  className="hidden"
+                  disabled={uploading}
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                      handleFileValidation(Array.from(e.target.files));
+                    }
+                  }}
+                />
+                <UploadCloud
+                  className={`w-8 h-8 mx-auto mb-3 transition-colors ${
+                    isDragOver ? "text-blue-500" : "text-slate-400"
+                  }`}
+                />
+                <p
+                  className={`text-sm font-medium transition-colors ${
+                    isDragOver ? "text-blue-700" : "text-slate-600"
+                  }`}
+                >
+                  {isDragOver
+                    ? "Lepaskan file di sini..."
+                    : "Seret & lepas file PDF ke sini"}
+                </p>
+                <p className="text-xs text-slate-400 mt-1">
+                  atau{" "}
+                  <span className="text-blue-500 font-medium underline">
+                    klik untuk memilih file
+                  </span>
+                </p>
+                <p className="text-xs text-slate-400 mt-2">
+                  Maks. 3 file · PDF saja · 5MB/file
+                </p>
+              </div>
+
+              {files.length > 0 && (
+                <div className="space-y-2 mt-4">
+                  {files.map((file, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-lg shadow-sm"
+                    >
+                      <div className="p-2 bg-slate-50 rounded-md">
+                        <FileText className="w-4 h-4 text-red-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-700 truncate">
+                          {file.name}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {(file.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={uploading}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!uploading) removeFile(idx);
+                        }}
+                        className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setSelectedScheme(null)}
+              disabled={uploading}
+            >
+              Batal
+            </Button>
+            <Button
+              onClick={confirmRegistration}
+              disabled={uploading}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {uploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Mengunggah & Mendaftar...
+                </>
+              ) : (
+                "Konfirmasi Pendaftaran"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

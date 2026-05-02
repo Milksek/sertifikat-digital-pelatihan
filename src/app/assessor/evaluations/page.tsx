@@ -55,6 +55,7 @@ export default function AssessorEvaluations() {
             profiles!participant_id(full_name, wallet_address, nik)
           `,
           )
+          .eq("assessor_id", user.id)
           .in("status", ["pending", "in_progress"])
           .order("created_at", { ascending: true });
         if (error) console.error("Assessor evaluations fetch error:", error);

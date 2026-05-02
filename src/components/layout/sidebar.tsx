@@ -3,8 +3,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/providers/auth-provider";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ProfileSettingsModal } from "@/components/profile-settings-modal";
+import { supabase } from "@/lib/supabase";
 import {
   Activity,
   Building2,
@@ -25,10 +26,21 @@ export function Sidebar() {
   const pathname = usePathname();
   const { role, user, logout } = useAuth();
   const [isProfileOpen, setProfileOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    if (!user || role !== "participant") return;
+    supabase
+      .from("assessments")
+      .select("id", { count: "exact", head: true })
+      .eq("participant_id", user.id)
+      .in("status", ["evaluated", "approved"])
+      .then(({ count }) => setPendingCount(count ?? 0));
+  }, [user, role]);
+
   const routes = {
     admin: [
       { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
-      { name: "Analytics Skripsi", href: "/admin/dashboard", icon: Activity },
       { name: "Skema Sertifikasi", href: "/admin/schemes", icon: Building2 },
       { name: "Kelola Asesor", href: "/admin/assessors", icon: Users },
       { name: "Kelola Peserta", href: "/admin/participants", icon: Users },
@@ -99,7 +111,7 @@ export function Sidebar() {
                 const isActive = pathname.startsWith(item.href);
                 return (
                   <Link
-                    key={item.href}
+                    key={item.name}
                     href={item.href}
                     prefetch={true}
                     className={cn(
@@ -116,6 +128,13 @@ export function Sidebar() {
                       )}
                     />
                     {item.name}
+                    {role === "participant" &&
+                      item.href === "/participant/assessments" &&
+                      pendingCount > 0 && (
+                        <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                          {pendingCount > 9 ? "9+" : pendingCount}
+                        </span>
+                      )}
                   </Link>
                 );
               })}
@@ -133,15 +152,13 @@ export function Sidebar() {
               </p>
               <p className="text-slate-500 truncate capitalize">{role}</p>
             </div>
-            {role !== "admin" && (
-              <button
-                onClick={() => setProfileOpen(true)}
-                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors shrink-0"
-                title="Pengaturan Profil"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
-            )}
+            <button
+              onClick={() => setProfileOpen(true)}
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors shrink-0"
+              title="Pengaturan Profil"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
           </div>
           <Button
             variant="outline"

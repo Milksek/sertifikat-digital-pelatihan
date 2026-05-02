@@ -13,6 +13,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ui/error-state";
+import { DetailPageSkeleton } from "@/components/ui/page-skeleton";
 import { uploadJsonToIPFS, uploadFileToIPFS } from "@/lib/pinata";
 import { certificateContract, client } from "@/lib/thirdweb";
 import { useActiveAccount } from "thirdweb/react";
@@ -22,7 +24,7 @@ export default function AdminMintCertificate() {
   const router = useRouter();
   const { user } = useAuth();
   const account = useActiveAccount();
-  const [assessment, setAssessment] = useState<unknown>(null);
+  const [assessment, setAssessment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [processStep, setProcessStep] = useState("");
@@ -138,7 +140,7 @@ export default function AdminMintCertificate() {
       });
       toast.success("Sertifikat berhasil dicetak!");
       router.push("/admin/dashboard");
-    } catch (e: unknown) {
+    } catch (e: any) {
       console.error(e);
       toast.error(e.message || "Gagal mencetak sertifikat");
     } finally {
@@ -155,20 +157,24 @@ export default function AdminMintCertificate() {
         .eq("id", id);
       toast.success("Penilaian ditolak");
       router.push("/admin/assessments");
-    } catch (e: unknown) {
+    } catch (e: any) {
       toast.error(e.message || "Gagal menolak penilaian");
     } finally {
       setProcessing(false);
     }
   };
-  if (loading)
+  if (loading) return <DetailPageSkeleton sections={4} />;
+  if (!assessment) {
     return (
-      <div className="space-y-6 max-w-4xl mx-auto">
-        <Skeleton className="h-10 w-1/3" />
-        <Skeleton className="h-[400px] w-full rounded-xl" />
-      </div>
+      <ErrorState
+        variant="not-found"
+        title="Penilaian Tidak Ditemukan"
+        description="Data penilaian tidak ada atau sudah dihapus dari sistem."
+        backHref="/admin/assessments"
+        backLabel="Kembali ke Daftar"
+      />
     );
-  if (!assessment) return <div>Penilaian tidak ditemukan</div>;
+  }
   const isPending = assessment.status === "evaluated";
   return (
     <div className="max-w-4xl mx-auto space-y-6">

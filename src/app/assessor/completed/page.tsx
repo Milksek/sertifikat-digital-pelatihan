@@ -145,10 +145,11 @@ export default function AssessorCompletedEvaluations() {
   };
   const getAvgScore = (score: unknown) => {
     if (!score || typeof score !== "object") return null;
-    const teori = score.teori ?? null;
-    const praktik = score.praktik ?? null;
-    if (teori === null || praktik === null) return null;
-    return Math.round((Number(teori) + Number(praktik)) / 2);
+    const teori = (score as any).teori ?? null;
+    const praktik = (score as any).praktik ?? null;
+    const wawancara = (score as any).wawancara ?? null;
+    if (teori === null || praktik === null || wawancara === null) return null;
+    return Number(((Number(teori) + Number(praktik) + Number(wawancara)) / 3).toFixed(2));
   };
   const filterOptions = [
     { value: "all", label: "Semua Hasil" },

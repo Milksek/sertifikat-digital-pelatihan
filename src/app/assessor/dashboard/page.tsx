@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DashboardSkeleton } from "@/components/ui/page-skeleton";
 import {
   FileCheck,
   Activity,
@@ -88,19 +89,7 @@ export default function AssessorDashboard() {
     fetchStats();
   }, [user]);
   const firstName = user?.full_name?.split(" ")[0] || "Asesor";
-  if (loading) {
-    return (
-      <div className="space-y-8">
-        <Skeleton className="h-36 w-full rounded-2xl" />
-        <div className="grid gap-5 md:grid-cols-3">
-          <Skeleton className="h-32 rounded-xl" />
-          <Skeleton className="h-32 rounded-xl" />
-          <Skeleton className="h-32 rounded-xl" />
-        </div>
-        <Skeleton className="h-64 w-full rounded-xl" />
-      </div>
-    );
-  }
+  if (loading) return <DashboardSkeleton stats={3} />;
   return (
     <div className="space-y-8">
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-900 via-blue-900 to-slate-900 p-8 text-white shadow-lg">

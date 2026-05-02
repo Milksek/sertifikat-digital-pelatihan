@@ -40,6 +40,8 @@ import {
   BookOpen,
   PenLine,
   ShieldCheck,
+  FileText,
+  Link as LinkIcon,
 } from "lucide-react";
 import Link from "next/link";
 interface AssessorProfile {
@@ -60,6 +62,7 @@ interface AssessmentRecord {
   score?: Record<string, number> | null;
   recommendation?: string | null;
   notes?: string | null;
+  portfolio_files?: string[] | null;
   assessor_id?: string | null;
   participant_id?: string;
   scheme_id?: string;
@@ -90,7 +93,7 @@ export default function AdminAssessments() {
         .from("assessments")
         .select(
           `
-          id, status, recommendation, score, evaluated_at, created_at, signature,
+          id, status, recommendation, score, evaluated_at, created_at, signature, portfolio_files,
           competency_schemes(name, criteria),
           profiles!participant_id(full_name, wallet_address, nik),
           assessor:profiles!assessor_id(full_name, wallet_address)
@@ -219,8 +222,9 @@ export default function AdminAssessments() {
     if (!score) return null;
     const t = score.teori ?? null;
     const p = score.praktik ?? null;
-    if (t === null || p === null) return null;
-    return Math.round((Number(t) + Number(p)) / 2);
+    const w = score.wawancara ?? null;
+    if (t === null || p === null || w === null) return null;
+    return Number(((Number(t) + Number(p) + Number(w)) / 3).toFixed(2));
   };
   return (
     <div className="space-y-6">
@@ -405,8 +409,8 @@ export default function AdminAssessments() {
                 )}
               </div>
               {selected.score && (
-                <div className="grid grid-cols-3 gap-3">
-                  {["teori", "praktik"].map((k) => (
+                <div className="grid grid-cols-4 gap-3">
+                  {["teori", "praktik", "wawancara"].map((k) => (
                     <div
                       key={k}
                       className="text-center bg-slate-50 rounded-xl p-3"
@@ -441,6 +445,26 @@ export default function AdminAssessments() {
                         .join(" - ")}
                     </p>
                   )}
+                </div>
+              )}
+              {selected?.portfolio_files && Array.isArray(selected.portfolio_files) && selected.portfolio_files.length > 0 && (
+                <div className="bg-slate-50 rounded-xl p-4">
+                  <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5" /> Dokumen Pendukung
+                  </h4>
+                  <div className="flex flex-col gap-2 mt-2">
+                    {(selected.portfolio_files as string[]).map((url: string, idx: number) => (
+                      <a
+                        key={idx}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1.5"
+                      >
+                        <LinkIcon className="w-3.5 h-3.5" /> Lihat Dokumen {idx + 1}
+                      </a>
+                    ))}
+                  </div>
                 </div>
               )}
               {selected.signature && (

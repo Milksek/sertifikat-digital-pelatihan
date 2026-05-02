@@ -6,26 +6,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Award,
-  FileCheck,
-  BookOpen,
-  ArrowRight,
-  Sparkles,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  ChevronRight,
-  Calendar,
-} from "lucide-react";
+import { Award, FileCheck, BookOpen, ArrowRight, Sparkles, Clock, CheckCircle2, XCircle, ChevronRight, Calendar, X, Rocket } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
+import { DashboardSkeleton } from "@/components/ui/page-skeleton";
 const globalStatsCache: Record<string, any> = {};
 const globalRecentCache: Record<string, any[]> = {};
+const ONBOARDING_KEY = "kompeten_onboarding_dismissed";
 export default function ParticipantDashboard() {
   const { user } = useAuth();
   const cacheKey = user?.id || "guest";
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [stats, setStats] = useState(
     globalStatsCache[cacheKey] || {
       assessments: 0,
@@ -116,6 +108,18 @@ export default function ParticipantDashboard() {
     }
     fetchStats();
   }, [user]);
+
+  useEffect(() => {
+    const dismissed = localStorage.getItem(ONBOARDING_KEY);
+    if (!dismissed && stats.assessments === 0 && stats.certificates === 0) {
+      setShowOnboarding(true);
+    }
+  }, [stats]);
+
+  const dismissOnboarding = () => {
+    localStorage.setItem(ONBOARDING_KEY, "1");
+    setShowOnboarding(false);
+  };
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "approved":
@@ -179,19 +183,7 @@ export default function ParticipantDashboard() {
       link: "/participant/schemes",
     },
   ];
-  if (loading) {
-    return (
-      <div className="space-y-8">
-        <Skeleton className="h-36 w-full rounded-2xl" />
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <Skeleton className="h-32 rounded-xl" />
-          <Skeleton className="h-32 rounded-xl" />
-          <Skeleton className="h-32 rounded-xl" />
-        </div>
-        <Skeleton className="h-64 w-full rounded-xl" />
-      </div>
-    );
-  }
+  if (loading) return <DashboardSkeleton stats={3} />;
   const firstName = user?.full_name?.split(" ")[0] || "Peserta";
   return (
     <div className="space-y-8">
@@ -222,6 +214,48 @@ export default function ParticipantDashboard() {
           </div>
         </div>
       </div>
+
+      {}
+      {showOnboarding && (
+        <div className="relative bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6 overflow-hidden">
+          <button
+            onClick={dismissOnboarding}
+            className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"
+            aria-label="Tutup"
+          >
+            <X className="w-4 h-4" />
+          </button>
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0">
+              <Rocket className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1 pr-8">
+              <h3 className="font-bold text-slate-900 mb-1">Selamat datang di KOMPETEN.ID! 🎉</h3>
+              <p className="text-sm text-slate-500 mb-4">
+                Mulai perjalanan sertifikasi Anda dengan mengikuti langkah berikut:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {[
+                  { step: "1", title: "Pilih Skema", desc: "Cari skema kompetensi yang sesuai bidang Anda", href: "/participant/schemes", color: "bg-blue-100 text-blue-700" },
+                  { step: "2", title: "Ikuti Assessment", desc: "Upload dokumen portofolio dan tunggu penilaian asesor", href: "/participant/assessments", color: "bg-purple-100 text-purple-700" },
+                  { step: "3", title: "Dapatkan NFT", desc: "Sertifikat diterbitkan di blockchain setelah lulus", href: "/participant/certificates", color: "bg-emerald-100 text-emerald-700" },
+                ].map((s) => (
+                  <Link key={s.step} href={s.href} className="block group">
+                    <div className="bg-white rounded-xl p-3 border border-slate-100 hover:border-blue-200 hover:shadow-sm transition-all">
+                      <span className={`inline-block text-xs font-bold px-2 py-0.5 rounded-full mb-2 ${s.color}`}>
+                        Langkah {s.step}
+                      </span>
+                      <p className="text-sm font-semibold text-slate-800">{s.title}</p>
+                      <p className="text-xs text-slate-500 mt-0.5 leading-snug">{s.desc}</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
         {statCards.map((stat) => {
           const Icon = stat.icon;
