@@ -117,13 +117,6 @@ export default function AdminDashboard() {
           </TableBody>
         </Table>
       </div>
-      <div className="mt-4 p-4 bg-indigo-50 border border-indigo-100 rounded-lg text-sm text-indigo-800 flex gap-3">
-         <Beaker className="w-8 h-8 opacity-70 shrink-0" />
-         <p>
-            Halaman analitik ini di-generate khusus untuk kemudahan penarikan data Skripsi Bab 4. Metrik akan terisi 
-            secara otomatis ketika ada aktivitas minting (menggunakan MATIC) dan verifikasi memindai kode QR.
-         </p>
-      </div>
     </div>
   );
 }
