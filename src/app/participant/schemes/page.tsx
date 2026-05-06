@@ -360,6 +360,7 @@ export default function ParticipantSchemes() {
               !Array.isArray(scheme.criteria)
                 ? (scheme.criteria as Record<string, any>)
                 : null;
+            const levelText = criteriaObj?.level || `Level ${level}`;
             const kodeSkkni = criteriaObj?.kode
               ? String(criteriaObj.kode)
               : "SKKNI-" +
@@ -381,7 +382,7 @@ export default function ParticipantSchemes() {
                       className={`text-xs font-semibold border ${levelColor}`}
                     >
                       <GraduationCap className="w-3 h-3 mr-1" />
-                      Level {level}
+                      {levelText}
                     </Badge>
                     {isRegistered &&
                       getStatusBadge(registeredAssessment.status)}
