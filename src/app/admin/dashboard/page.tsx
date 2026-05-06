@@ -54,7 +54,7 @@ export default function AdminDashboard() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-          <Activity className="w-8 h-8 text-blue-600" /> Dashboard Evaluasi Skripsi
+          <Activity className="w-8 h-8 text-blue-600" /> Dashboard Evaluasi
         </h1>
         <p className="text-slate-500 mt-1">Pantau dan kelola data metrik evaluasi sistem terdesentralisasi Anda.</p>
       </div>
