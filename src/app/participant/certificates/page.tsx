@@ -69,6 +69,12 @@ export default function ParticipantCertificates() {
     globalCertsCache[cacheKey] || [],
   );
   const [loading, setLoading] = useState(!globalCertsCache[cacheKey]);
+  const [origin, setOrigin] = useState("");
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setOrigin(window.location.origin);
+    }
+  }, []);
   useEffect(() => {
     async function fetchCertificates() {
       if (!user?.wallet_address) {
@@ -245,7 +251,7 @@ export default function ParticipantCertificates() {
                   locale: idLocale,
                 })
               : "-";
-            const verifyUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/verify?cert=${cert.certificate_number}`;
+            const verifyUrl = `${origin || "https://kompeten-id.vercel.app"}/verify?cert=${cert.certificate_number}`;
             const criteriaList: unknown[] = Array.isArray(
               cert.competency_schemes?.criteria,
             )
@@ -471,32 +477,39 @@ export default function ParticipantCertificates() {
                           </div>
                           <div className="pt-5 mt-4 border-t border-slate-100 space-y-2">
                             <Button
-                              className="w-full bg-blue-600 hover:bg-blue-700 gap-2"
-                              onClick={() => window.open(verifyUrl, "_blank")}
+                              asChild
+                              className="w-full bg-blue-600 hover:bg-blue-700 gap-2 cursor-pointer"
                             >
-                              <Link2 className="w-4 h-4" /> Verifikasi Online /
-                              Blockchain
+                              <a
+                                href={verifyUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <Link2 className="w-4 h-4" /> Verifikasi Online /
+                                Blockchain
+                              </a>
                             </Button>
                             <Button
                               variant="outline"
-                              className="w-full border-slate-200 text-slate-600 gap-2"
+                              className="w-full border-slate-200 text-slate-600 gap-2 cursor-pointer"
                               onClick={() => handleCopyLink(cert)}
                             >
                               <Copy className="w-4 h-4" /> Salin Link Verifikasi
                             </Button>
                             {cert.tx_hash && (
                               <Button
+                                asChild
                                 variant="outline"
-                                className="w-full border-slate-200 text-slate-600 gap-2"
-                                onClick={() =>
-                                  window.open(
-                                    `https://amoy.polygonscan.com/tx/${cert.tx_hash}`,
-                                    "_blank",
-                                  )
-                                }
+                                className="w-full border-slate-200 text-slate-600 gap-2 cursor-pointer"
                               >
-                                Lihat di Polygonscan{" "}
-                                <ExternalLink className="w-3.5 h-3.5" />
+                                <a
+                                  href={`https://amoy.polygonscan.com/tx/${cert.tx_hash}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  Lihat di Polygonscan{" "}
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                </a>
                               </Button>
                             )}
                           </div>
