@@ -1,9 +1,9 @@
-
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "@thirdweb-dev/contracts/base/ERC721Base.sol";
 
-contract KompetenIDCertificate is ERC721Base {
+contract SertifikatDigital is ERC721Base {
     bool public soulbound = true;
 
     constructor(
