@@ -351,7 +351,7 @@ export default function ParticipantSchemes() {
             const registeredAssessment = myAssessments[scheme.id];
             const criteriaList: unknown[] = Array.isArray(scheme.criteria)
               ? scheme.criteria
-              : [];
+              : ((scheme.criteria as any)?.units || []);
             const isRegistered = !!registeredAssessment;
             const level = getLevelFromCriteria(criteriaList);
             const levelColor = getLevelColor(level);
