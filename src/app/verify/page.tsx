@@ -204,6 +204,9 @@ function VerifyPageInner() {
             certificate_id: data.id,
             query: trimmed,
             verifier_ip: "public",
+            blockchain_time_ms: bcTime,
+            ipfs_time_ms: ipfsTime,
+            total_time_ms: totalTime
           })
           .then();
       } catch (bcError) {
