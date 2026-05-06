@@ -10,8 +10,9 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-export async function generateMetadata({ params }: { params: { wallet: string } }) {
-  const wallet = decodeURIComponent(params.wallet).toLowerCase();
+export async function generateMetadata({ params }: { params: Promise<{ wallet: string }> }) {
+  const { wallet: rawWallet } = await params;
+  const wallet = decodeURIComponent(rawWallet).toLowerCase();
   const { data: profile } = await supabase
     .from("profiles")
     .select("full_name")
@@ -26,8 +27,9 @@ export async function generateMetadata({ params }: { params: { wallet: string } 
   };
 }
 
-export default async function PublicProfilePage({ params }: { params: { wallet: string } }) {
-  const wallet = decodeURIComponent(params.wallet).toLowerCase();
+export default async function PublicProfilePage({ params }: { params: Promise<{ wallet: string }> }) {
+  const { wallet: rawWallet } = await params;
+  const wallet = decodeURIComponent(rawWallet).toLowerCase();
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -45,7 +47,7 @@ export default async function PublicProfilePage({ params }: { params: { wallet: 
         assessor:profiles!assessor_id(full_name)
       )
     `)
-    .eq("participant_wallet", wallet)
+    .ilike("participant_wallet", wallet)
     .eq("status", "active")
     .order("minted_at", { ascending: false });
 
