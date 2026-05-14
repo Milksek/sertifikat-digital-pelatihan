@@ -77,6 +77,12 @@ export default function ParticipantAssessments() {
   }, [user]);
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case "certified":
+        return (
+          <Badge className="bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-100 gap-1.5 font-medium">
+            <FileCheck className="w-3 h-3" /> Tersertifikasi
+          </Badge>
+        );
       case "approved":
         return (
           <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100 gap-1.5 font-medium">
@@ -114,6 +120,12 @@ export default function ParticipantAssessments() {
   };
   const getResultBadge = (status: string) => {
     switch (status) {
+      case "certified":
+        return (
+          <Badge className="bg-purple-500 hover:bg-purple-600 text-white gap-1.5">
+            <FileCheck className="w-3 h-3" /> Kompeten
+          </Badge>
+        );
       case "approved":
         return (
           <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white gap-1.5">
