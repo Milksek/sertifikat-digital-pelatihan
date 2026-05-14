@@ -443,6 +443,150 @@ function MintPageInner() {
       setMintStep("idle");
     }
   };
+  const handleMintOneByOne = async () => {
+    if (!account || previewImages.length === 0 || !certificateContract) return;
+    try {
+      setIsPreviewOpen(false);
+      let successCount = 0;
+      const transactions = [];
+      for (let i = 0; i < previewImages.length; i++) {
+        const preview = previewImages[i];
+        const assessment = approvedAssessments.find(
+          (a) => a.id === preview.assessmentId,
+        );
+        if (!assessment) continue;
+        const participant = assessment.profiles as any;
+        const scheme = assessment.competency_schemes as any;
+        const res = await fetch(preview.dataUrl);
+        const blob = await res.blob();
+        const generatedFile = new File(
+          [blob],
+          `certificate-${assessment.id}.webp`,
+          { type: "image/webp" },
+        );
+        setMintStep("uploading_image");
+        toast.loading(
+          `[${i + 1}/${previewImages.length}] Mengunggah gambar: ${participant.full_name}...`,
+          { id: "mint-progress" },
+        );
+        const imageUri = await uploadFileToIPFS(generatedFile);
+        const ts = Date.now().toString().slice(-6);
+        const autoCertNumber = `LSP-${ts}-${assessment.id.slice(0, 4).toUpperCase()}`;
+        setMintStep("uploading_metadata");
+        toast.loading(
+          `[${i + 1}/${previewImages.length}] Mengunggah metadata: ${participant.full_name}...`,
+          { id: "mint-progress" },
+        );
+        const metadata = {
+          name: `Sertifikat Kompetensi: ${scheme.name}`,
+          description: `Sertifikat NFT diterbitkan oleh LSP untuk ${participant.full_name}`,
+          image: imageUri,
+          attributes: [
+            { trait_type: "Scheme", value: scheme.name },
+            { trait_type: "Certificate Number", value: autoCertNumber },
+            { trait_type: "Recipient", value: participant.full_name },
+            {
+              trait_type: "Recommendation",
+              value: assessment.recommendation?.split(" - ")[0] || "",
+            },
+            { trait_type: "Issued At", value: new Date().toISOString() },
+          ],
+          criteria: Array.isArray(scheme.criteria) ? scheme.criteria : [],
+        };
+        const metadataUri = await uploadJsonToIPFS(metadata);
+        setMintStep("minting");
+        toast.loading(
+          `[${i + 1}/${previewImages.length}] Menunggu MetaMask: ${participant.full_name}...`,
+          { id: "mint-progress" },
+        );
+        let tokenId = BigInt(0);
+        try {
+          tokenId = await readContract({
+            contract: certificateContract,
+            method: "function nextTokenIdToMint() view returns (uint256)",
+            params: [],
+          });
+        } catch {
+          console.warn("Gagal membaca nextTokenIdToMint, fallback ke 0");
+        }
+        const transaction = prepareContractCall({
+          contract: certificateContract,
+          method:
+            "function batchMintToMultiple(address[] calldata recipients, string[] calldata uris)",
+          params: [[participant.wallet_address], [metadataUri]],
+        });
+        setMintStep("confirming");
+        const { transactionHash } = await sendTransaction({
+          transaction,
+          account,
+        });
+        toast.loading(
+          `[${i + 1}/${previewImages.length}] Mengonfirmasi transaksi...`,
+          { id: "mint-progress" },
+        );
+        const receipt = await waitForReceipt({
+          client,
+          chain: certificateContract.chain,
+          transactionHash,
+        });
+        const gasUsed = receipt.gasUsed;
+        const effectiveGasPrice = receipt.effectiveGasPrice;
+        const totalFeeWei = gasUsed * effectiveGasPrice;
+        const totalFeeMatic = Number(totalFeeWei) / 1e18;
+        await supabase.from("transaction_logs").insert({
+          transaction_hash: transactionHash,
+          action_type: "SINGLE_MINT",
+          recipients_count: 1,
+          gas_used: Number(gasUsed),
+          effective_gas_price: Number(effectiveGasPrice),
+          total_fee_matic: totalFeeMatic,
+        });
+        await supabase.from("certificates").insert({
+          assessment_id: assessment.id,
+          scheme_id: scheme.id,
+          certificate_number: autoCertNumber,
+          metadata_uri: metadataUri,
+          tx_hash: transactionHash,
+          token_id: tokenId.toString(),
+          status: "active",
+          minted_by: user?.id,
+          minted_at: new Date().toISOString(),
+          participant_wallet: participant.wallet_address.toLowerCase(),
+          ipfs_image_uri: imageUri,
+        });
+        await supabase
+          .from("assessments")
+          .update({ status: "certified" })
+          .eq("id", assessment.id);
+        await supabase
+          .from("activity_logs")
+          .insert({
+            user_id: user?.id,
+            action: "mint_nft",
+            details: `NFT Diterbitkan (${participant.full_name}) – Tx: ${transactionHash}`,
+          })
+          .maybeSingle();
+        transactions.push({
+          name: participant.full_name,
+          txHash: transactionHash,
+          tokenId: tokenId.toString(),
+        });
+        successCount++;
+      }
+      toast.dismiss("mint-progress");
+      setResultDetails(transactions);
+      setMintStep("success");
+      toast.success(
+        `${successCount} Sertifikat NFT berhasil diterbitkan satu per satu! (${successCount} transaksi)`,
+      );
+      fetchAssessments();
+    } catch (e: any) {
+      toast.dismiss("mint-progress");
+      console.error(e);
+      toast.error(e.message || "Proses mint gagal");
+      setMintStep("idle");
+    }
+  };
   const stepLabel: Record<MintStep, string> = {
     idle: "Mint Sertifikat NFT",
     uploading_image: "Mengunggah template ke IPFS...",
@@ -804,6 +948,21 @@ function MintPageInner() {
               Batalkan
             </Button>
             <Button
+              onClick={handleMintOneByOne}
+              disabled={isMinting}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              {isMinting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Memproses...
+                </>
+              ) : (
+                <>
+                  <Award className="w-4 h-4 mr-2" /> Mint Satu per Satu ({previewImages.length}x Tx)
+                </>
+              )}
+            </Button>
+            <Button
               onClick={handleMint}
               disabled={isMinting}
               className="bg-emerald-600 hover:bg-emerald-700"
@@ -814,7 +973,7 @@ function MintPageInner() {
                 </>
               ) : (
                 <>
-                  <Award className="w-4 h-4 mr-2" /> Konfirmasi & Mint Semua
+                  <Award className="w-4 h-4 mr-2" /> Batch Mint (1x Tx)
                 </>
               )}
             </Button>
