@@ -130,11 +130,8 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                 {cert.ipfs_image_uri ? (
                   <img
                     src={`https://ipfs.io/ipfs/${cert.ipfs_image_uri.replace("ipfs://", "")}`}
-                    alt={cert.competency_schemes?.name}
+                    alt={cert.competency_schemes?.name || "Sertifikat"}
                     className="w-full aspect-[4/3] object-cover border-b border-slate-100"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none";
-                    }}
                   />
                 ) : (
                   <div className="w-full aspect-[4/3] bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center border-b border-slate-100">
