@@ -211,7 +211,12 @@ function VerifyPageInner() {
           .then();
       } catch (bcError) {
         console.error("Gagal Verifikasi On-Chain:", bcError);
-        setState("not_found");
+        if (data && data.status === "revoked") {
+          setResult(data);
+          setState("revoked");
+        } else {
+          setState("not_found");
+        }
         return;
       }
     } catch {
