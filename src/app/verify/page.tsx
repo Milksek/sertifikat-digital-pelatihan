@@ -562,7 +562,7 @@ function VerifyPageInner() {
                     ❌ SERTIFIKAT DICABUT
                   </h2>
                   <p className="text-sm text-red-600">
-                    Sertifikat ini telah dicabut oleh LSP Admin dan tidak lagi
+                    Sertifikat ini telah dicabut oleh Admin dan tidak lagi
                     berlaku.
                   </p>
                 </div>

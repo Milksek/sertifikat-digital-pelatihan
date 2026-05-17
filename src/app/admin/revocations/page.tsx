@@ -308,7 +308,7 @@ export default function AdminRevoke() {
                       "Pelanggaran kode etik",
                       "Masa berlaku habis",
                       "Salah input data",
-                      "Ditarik oleh LSP",
+                      "Ditarik oleh Admin",
                       "Pindah ke sertifikat level atas",
                     ].map((templateReason) => (
                       <Badge

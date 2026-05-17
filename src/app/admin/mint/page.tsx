@@ -173,7 +173,7 @@ function MintPageInner() {
         const participant = assessment.profiles as any;
         const scheme = assessment.competency_schemes as any;
         const ts = Date.now().toString().slice(-6);
-        const autoCertNumber = `LSP-${ts}-${assessment.id.slice(0, 4).toUpperCase()}`;
+        const autoCertNumber = `CERT-${ts}-${assessment.id.slice(0, 4).toUpperCase()}`;
         drawTextLeft(
           ctx,
           autoCertNumber,
@@ -310,7 +310,7 @@ function MintPageInner() {
         );
         const imageUri = await uploadFileToIPFS(generatedFile);
         const ts = Date.now().toString().slice(-6);
-        const autoCertNumber = `LSP-${ts}-${assessment.id.slice(0, 4).toUpperCase()}`;
+        const autoCertNumber = `CERT-${ts}-${assessment.id.slice(0, 4).toUpperCase()}`;
         setMintStep("uploading_metadata");
         toast.loading(
           `Mengunggah metadata ${i + 1}/${previewImages.length}: ${participant.full_name}...`,
@@ -318,7 +318,7 @@ function MintPageInner() {
         );
         const metadata = {
           name: `Sertifikat Kompetensi: ${scheme.name}`,
-          description: `Sertifikat NFT diterbitkan oleh LSP untuk ${participant.full_name}`,
+          description: `Sertifikat NFT diterbitkan untuk ${participant.full_name}`,
           image: imageUri,
           attributes: [
             { trait_type: "Scheme", value: scheme.name },
@@ -471,7 +471,7 @@ function MintPageInner() {
         );
         const imageUri = await uploadFileToIPFS(generatedFile);
         const ts = Date.now().toString().slice(-6);
-        const autoCertNumber = `LSP-${ts}-${assessment.id.slice(0, 4).toUpperCase()}`;
+        const autoCertNumber = `CERT-${ts}-${assessment.id.slice(0, 4).toUpperCase()}`;
         setMintStep("uploading_metadata");
         toast.loading(
           `[${i + 1}/${previewImages.length}] Mengunggah metadata: ${participant.full_name}...`,
@@ -479,7 +479,7 @@ function MintPageInner() {
         );
         const metadata = {
           name: `Sertifikat Kompetensi: ${scheme.name}`,
-          description: `Sertifikat NFT diterbitkan oleh LSP untuk ${participant.full_name}`,
+          description: `Sertifikat NFT diterbitkan untuk ${participant.full_name}`,
           image: imageUri,
           attributes: [
             { trait_type: "Scheme", value: scheme.name },

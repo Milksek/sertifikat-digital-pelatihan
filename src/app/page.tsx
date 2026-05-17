@@ -300,7 +300,7 @@ export default async function LandingPage() {
             <ul className="space-y-2 text-sm">
               <li>
                 <Link href="#" className="hover:text-white transition-colors">
-                  Tentang LSP
+                  Tentang Kami
                 </Link>
               </li>
               <li>
