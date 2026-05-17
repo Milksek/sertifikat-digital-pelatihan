@@ -7,10 +7,20 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
       if (typeof window !== "undefined") {
         const token = localStorage.getItem("kompetenid_token");
         if (token) {
-          init = init || {};
-          const headers = new Headers(init.headers);
-          headers.set("Authorization", `Bearer ${token}`);
-          init.headers = headers;
+          try {
+            const payload = JSON.parse(atob(token.split(".")[1]));
+            const isExpired = payload.exp * 1000 < Date.now();
+            if (isExpired) {
+              localStorage.removeItem("kompetenid_token");
+            } else {
+              init = init || {};
+              const headers = new Headers(init.headers);
+              headers.set("Authorization", `Bearer ${token}`);
+              init.headers = headers;
+            }
+          } catch {
+            localStorage.removeItem("kompetenid_token");
+          }
         }
       }
       return fetch(input, init);
