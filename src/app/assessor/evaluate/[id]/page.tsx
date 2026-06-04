@@ -135,7 +135,7 @@ export default function EvaluatePage() {
         .eq("id", id);
       if (error) throw error;
       toast.success("Evaluasi berhasil dikirim dan ditandatangani!");
-      router.push("/assessor/completed");
+      router.push("/assessor/evaluations");
     } catch (error: any) {
       toast.error(error.message || "Gagal mengirim evaluasi");
     } finally {
