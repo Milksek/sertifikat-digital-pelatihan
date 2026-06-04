@@ -68,11 +68,11 @@ export default function EvaluatePage() {
   const [assessment, setAssessment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [teori, setTeori] = useState<number | "">("");
-  const [praktik, setPraktik] = useState<number | "">("");
-  const [wawancara, setWawancara] = useState<number | "">("");
+  const [teori, setTeori] = useState<number | "">(85);
+  const [praktik, setPraktik] = useState<number | "">(90);
+  const [wawancara, setWawancara] = useState<number | "">(88);
   const [recommendation, setRecommendation] = useState<string>("Kompeten");
-  const [notes, setNotes] = useState<string>("");
+  const [notes, setNotes] = useState<string>("Peserta menunjukkan pemahaman yang sangat baik pada materi teori dan mampu mengaplikasikan keterampilan praktis sesuai standar yang ditetapkan.");
 
   useEffect(() => {
     async function fetchAssessment() {
