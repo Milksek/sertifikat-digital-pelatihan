@@ -185,7 +185,7 @@ function VerifyPageInner() {
         const ipfsStartTime = performance.now();
         const uri = data.ipfs_image_uri || data.metadata_uri;
         if (uri) {
-          const url = resolveScheme({ client, uri });
+          const url = uri.replace("ipfs://", "https://ipfs.io/ipfs/");
           await fetch(url, { method: "HEAD" }).catch(() => {});
           setImageUrl(url);
         }
