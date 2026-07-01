@@ -57,11 +57,18 @@ async function downloadCertAsPdf(
     reader.readAsDataURL(blob);
   });
   const imgType = blob.type.includes("png") ? "PNG" : "JPEG";
-  const fitW = pageW - 10;
-  const fitH = fitW * 0.707;
-  const offsetX = (pageW - fitW) / 2;
-  const offsetY = (pageH - fitH) / 2;
-  pdf.addImage(base64, imgType, offsetX, offsetY, fitW, fitH);
+  // Get original image dimensions
+  const img = await createImageBitmap(blob);
+  const imgW = img.width;
+  const imgH = img.height;
+  // Convert px to mm at 96dpi
+  const mmW = imgW * 0.264583;
+  const mmH = imgH * 0.264583;
+  const pdfW = Math.max(mmW, pageW);
+  const pdfH = Math.max(mmH, pageH);
+  pdf.setFontSize(1);
+  pdf.addPage([pdfW, pdfH], "landscape");
+  pdf.addImage(base64, imgType, 0, 0, pdfW, pdfH);
   const safeName = (participantName || "sertifikat").replace(/\s+/g, "_");
   pdf.save(`${cert.certificate_number}_${safeName}.pdf`);
 }
