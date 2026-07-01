@@ -137,7 +137,7 @@ function VerifyPageInner() {
         .select(
           `*, competency_schemes(name, criteria),
           assessments(id, recommendation, score,
-            profiles!participant_id(full_name, nik, wallet_address))`,
+            profiles!participant_id(full_name, wallet_address))`,
         )
         .or(`certificate_number.eq.${trimmed},token_id.eq.${trimmed}`)
         .maybeSingle();
@@ -152,7 +152,7 @@ function VerifyPageInner() {
           .select(
             `*, competency_schemes(name, criteria),
             assessments(id, recommendation, score,
-              profiles!participant_id(full_name, nik, wallet_address))`,
+              profiles!participant_id(full_name, wallet_address))`,
           )
           .ilike("participant_wallet", trimmed)
           .limit(1)
