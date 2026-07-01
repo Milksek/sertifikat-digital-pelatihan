@@ -227,12 +227,23 @@ function VerifyPageInner() {
     e.preventDefault();
     doVerify(query);
   };
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (!imageUrl) return window.print();
-    const a = document.createElement("a");
-    a.href = imageUrl;
-    a.download = `sertifikat-${result?.certificate_number || "cert"}.webp`;
-    a.click();
+    const { jsPDF } = await import("jspdf");
+    const response = await fetch(imageUrl);
+    const blob = await response.blob();
+    const base64 = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(blob);
+    });
+    const imgType = blob.type.includes("png") ? "PNG" : "JPEG";
+    const img = await createImageBitmap(blob);
+    const mmW = img.width * 0.264583;
+    const mmH = img.height * 0.264583;
+    const pdf = new jsPDF({ orientation: mmW > mmH ? "landscape" : "portrait", unit: "mm", format: [mmW, mmH] });
+    pdf.addImage(base64, imgType, 0, 0, mmW, mmH);
+    pdf.save(`${result?.certificate_number || "sertifikat"}.pdf`);
   };
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
