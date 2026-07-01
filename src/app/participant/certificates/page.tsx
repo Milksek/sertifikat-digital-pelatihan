@@ -46,9 +46,6 @@ async function downloadCertAsPdf(
   participantName: string,
 ) {
   const { jsPDF } = await import("jspdf");
-  const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  const pageW = pdf.internal.pageSize.getWidth();
-  const pageH = pdf.internal.pageSize.getHeight();
   const response = await fetch(imageUrl);
   const blob = await response.blob();
   const base64 = await new Promise<string>((resolve) => {
@@ -57,18 +54,11 @@ async function downloadCertAsPdf(
     reader.readAsDataURL(blob);
   });
   const imgType = blob.type.includes("png") ? "PNG" : "JPEG";
-  // Get original image dimensions
   const img = await createImageBitmap(blob);
-  const imgW = img.width;
-  const imgH = img.height;
-  // Convert px to mm at 96dpi
-  const mmW = imgW * 0.264583;
-  const mmH = imgH * 0.264583;
-  const pdfW = Math.max(mmW, pageW);
-  const pdfH = Math.max(mmH, pageH);
-  pdf.setFontSize(1);
-  pdf.addPage([pdfW, pdfH], "landscape");
-  pdf.addImage(base64, imgType, 0, 0, pdfW, pdfH);
+  const mmW = img.width * 0.264583;
+  const mmH = img.height * 0.264583;
+  const pdf = new jsPDF({ orientation: mmW > mmH ? "landscape" : "portrait", unit: "mm", format: [mmW, mmH] });
+  pdf.addImage(base64, imgType, 0, 0, mmW, mmH);
   const safeName = (participantName || "sertifikat").replace(/\s+/g, "_");
   pdf.save(`${cert.certificate_number}_${safeName}.pdf`);
 }
