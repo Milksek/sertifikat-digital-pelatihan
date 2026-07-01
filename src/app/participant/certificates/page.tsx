@@ -57,7 +57,11 @@ async function downloadCertAsPdf(
     reader.readAsDataURL(blob);
   });
   const imgType = blob.type.includes("png") ? "PNG" : "JPEG";
-  pdf.addImage(base64, imgType, 0, 0, pageW, pageH);
+  const fitW = pageW - 10;
+  const fitH = fitW * 0.707;
+  const offsetX = (pageW - fitW) / 2;
+  const offsetY = (pageH - fitH) / 2;
+  pdf.addImage(base64, imgType, offsetX, offsetY, fitW, fitH);
   const safeName = (participantName || "sertifikat").replace(/\s+/g, "_");
   pdf.save(`${cert.certificate_number}_${safeName}.pdf`);
 }
