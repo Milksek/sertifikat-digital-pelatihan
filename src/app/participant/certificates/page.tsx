@@ -136,7 +136,7 @@ export default function ParticipantCertificates() {
   }, [user]);
   const getImageUrl = (ipfsUri: string) => {
     if (!ipfsUri) return "";
-    return resolveScheme({ client, uri: ipfsUri });
+    return ipfsUri.replace("ipfs://", "https://ipfs.io/ipfs/");
   };
   const handleShare = (cert: any) => {
     const url = `${window.location.origin}/verify?cert=${cert.certificate_number}`;
