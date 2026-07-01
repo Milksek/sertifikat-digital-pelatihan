@@ -227,7 +227,13 @@ function VerifyPageInner() {
     e.preventDefault();
     doVerify(query);
   };
-  const handlePrint = () => window.print();
+  const handlePrint = () => {
+    if (!imageUrl) return window.print();
+    const a = document.createElement("a");
+    a.href = imageUrl;
+    a.download = `sertifikat-${result?.certificate_number || "cert"}.webp`;
+    a.click();
+  };
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
     toast.success("Disalin!");
