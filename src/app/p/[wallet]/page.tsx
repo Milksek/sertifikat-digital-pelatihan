@@ -33,7 +33,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, nik")
+    .select("full_name")
     .ilike("wallet_address", wallet)
     .maybeSingle();
 
@@ -86,9 +86,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
             </div>
             <div className="text-center sm:text-left">
               <h1 className="text-2xl sm:text-3xl font-bold">{displayName}</h1>
-              {profile?.nik && (
-                <p className="text-blue-200 text-sm mt-1">NIK: {profile.nik}</p>
-              )}
+              
               <p className="text-slate-400 font-mono text-xs mt-2 break-all">
                 {wallet}
               </p>
