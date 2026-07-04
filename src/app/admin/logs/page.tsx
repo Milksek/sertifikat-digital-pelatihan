@@ -29,6 +29,7 @@ import {
   FileCheck,
   RefreshCw,
   ClipboardList,
+  UserPlus,
 } from "lucide-react";
 const ACTION_LABELS: Record<
   string,
@@ -48,6 +49,11 @@ const ACTION_LABELS: Record<
     label: "Penugasan Asesor",
     icon: ClipboardList,
     color: "bg-blue-100 text-blue-700 border-blue-200",
+  },
+  tambah_asesor: {
+    label: "Tambah Asesor",
+    icon: UserPlus,
+    color: "bg-indigo-100 text-indigo-700 border-indigo-200",
   },
 };
 const globalLogsCache: Record<string, any[]> = {};
@@ -162,6 +168,7 @@ export default function AdminLogs() {
             <SelectItem value="mint_certificate">Mint Sertifikat</SelectItem>
             <SelectItem value="pencabutan_sertifikat">Pencabutan</SelectItem>
             <SelectItem value="assign_assessor">Penugasan Asesor</SelectItem>
+            <SelectItem value="tambah_asesor">Tambah Asesor</SelectItem>
           </SelectContent>
         </Select>
       </div>

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useEffect, useState } from "react";
 import {
   Table,
@@ -81,23 +81,7 @@ export default function AdminAssessors() {
     fetchUsers();
   }, []);
 
-  const toggleAssessorRole = async (userId: string, currentRole: string) => {
-    const newRole = currentRole === "assessor" ? "participant" : "assessor";
-    try {
-      const { error } = await supabase
-        .from("profil")
-        .update({ role: newRole })
-        .eq("id", userId);
-      if (error) throw error;
-      toast.success(
-        `Role berhasil diubah menjadi ${newRole === "assessor" ? "Asesor" : "Peserta"}`,
-      );
-      globalAssessorsCache = null;
-      fetchUsers();
-    } catch (e: unknown) {
-      toast.error((e as any).message || "Gagal mengubah role");
-    }
-  };
+
 
   const handleCreateAssessor = async () => {
     const wallet = form.walletAddress.trim().toLowerCase();
@@ -226,16 +210,13 @@ export default function AdminAssessors() {
               <TableHead className="font-semibold text-slate-700">
                 Mendaftar
               </TableHead>
-              <TableHead className="text-right font-semibold text-slate-700">
-                Aksi
-              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 6 }).map((_, j) => (
+                  {Array.from({ length: 5 }).map((_, j) => (
                     <TableCell key={j}>
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
@@ -244,7 +225,7 @@ export default function AdminAssessors() {
               ))
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-40 text-center">
+                <TableCell colSpan={5} className="h-40 text-center">
                   <div className="flex flex-col items-center gap-2">
                     <Shield className="w-10 h-10 text-slate-200" />
                     <p className="text-sm text-slate-500">
@@ -281,16 +262,6 @@ export default function AdminAssessors() {
                     {format(new Date(u.created_at), "dd MMM yyyy", {
                       locale: idLocale,
                     })}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      className="h-7 text-xs gap-1.5 border-red-200 text-red-600 hover:bg-red-50"
-                      variant="outline"
-                      onClick={() => toggleAssessorRole(u.id, u.role)}
-                    >
-                      <UserX className="w-3 h-3" /> Cabut Asesor
-                    </Button>
                   </TableCell>
                 </TableRow>
               ))
