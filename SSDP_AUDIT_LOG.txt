@@ -1,0 +1,202 @@
+=============================================================
+SSDP AUDIT LOG
+Generated: 2026-07-04 19:36:00 WIB
+Last Updated: Round 3 security patches
+=============================================================
+
+CONTRACT ADDRESS FINAL:
+  Old (batchMintToMultiple only): 0x00a82b2977C1210c5470a87226b8C0Db9E3B0c48
+  Previous (soulbound mutable)  : 0x8Ad76629E76f6f6c3ffB55cB1219e6FB92866D36
+  FINAL (soulbound permanent)   : [PENDING DEPLOY - use address from Thirdweb]
+
+TOKEN NAME  : Sertifikat Pelatihan Digital
+TOKEN SYMBOL: SPDW
+NETWORK     : Polygon Amoy Testnet
+CHAIN ID    : 80002
+
+=============================================================
+HARDHAT TEST RESULT (13/13 PASSED)
+=============================================================
+
+  Sistem Sertifikasi
+    Deployment
+      √ Should set the right owner
+      √ Should have soulbound permanently enabled as constant
+    Minting
+      √ Should allow owner to mint a certificate
+      √ Should revert if non-owner tries to mint
+      √ Should store the correct token URI
+    Soulbound
+      √ Should revert on transfer
+      √ Should revert on approve
+      √ Should return false for isApprovedForAll
+      √ Should still revert on transfer even after multiple mints
+    Admin functions
+      √ Should allow owner to burn a certificate
+    Authenticity Verification
+      √ Should record the correct owner of the minted certificate
+      √ Should store metadata URI exactly as submitted (immutable proof)
+      √ Should increment token ID after each mint (traceable issuance)
+
+  13 passing (1s)
+
+=============================================================
+NEXT.JS BUILD RESULT (SUCCESS, 0 ERRORS)
+=============================================================
+
+▲ Next.js 16.1.6 (Turbopack)
+✓ Compiled successfully
+✓ Generating static pages (32/32)
+
+Routes compiled:
+  Static : /, /admin/*, /assessor/*, /participant/*, /verify, /login, /register
+  Dynamic: /admin/mint/[id], /api/admin/mint, /api/admin/assessors,
+           /api/admin/participants, /api/public/verify,
+           /assessor/evaluate/[id], /api/auth/sync, etc.
+  Total  : 32 routes, 0 errors
+
+=============================================================
+SECURITY FIXES APPLIED (3 ROUNDS)
+=============================================================
+
+--- Round 1 ---
+[✓] Reusable auth library: src/lib/server-auth.ts
+    - requireAuthenticatedUser, requireAdminUser, requireAssessorUser
+    - getAdminClient, getAuthedClient, getBearerToken
+[✓] /api/auth/sync: bodyRole IGNORED for non-master wallets
+[✓] /api/admin/assessors: admin auth guard added
+[✓] /api/admin/participants: admin auth guard added
+[✓] /api/admin/mint: refactored to use server-auth.ts
+[✓] /api/profile/by-wallet: role/nik/email/phone hidden from response
+[✓] /api/ipfs/upload-file: DELETED (unused endpoint)
+[✓] /api/ipfs/upload-json: DELETED (unused endpoint)
+[✓] certificate-renderer.ts: path → public/certificate_template.png
+[✓] RenderCertificateInput: verifyUrl?: string added
+[✓] Migration: public.is_admin(uid UUID) with search_path security
+[✓] Migration: verify_certificate_public RPC added
+[✓] scripts/create-audit-zip.ps1: ZIP packager created
+
+--- Round 2 ---
+[✓] RLS: profil_insert_own DROPPED (role escalation vector)
+[✓] RLS: profil_update_own DROPPED (role escalation vector)
+[✓] handle_new_user: role hardcoded to 'participant', metadata ignored
+[✓] handle_new_user: SET search_path = public added
+[✓] POST /api/admin/assessors: admin-only assessor creation
+[✓] Assessors page: Bearer token on GET + POST to /api/admin/assessors
+[✓] Participants page: Bearer token added to GET
+[✓] Dashboard summary: activity_type/activity_detail columns fixed
+[✓] Dashboard summary: refactored to use server-auth.ts
+[✓] Dead code: src/lib/pinata.ts DELETED
+[✓] .env.example: old contract address cleared
+
+--- Round 3 ---
+[✓] /api/auth/sync: viem verifyMessage added (wallet impersonation blocked)
+[✓] /api/auth/sync: bodyRole removed from destructuring
+[✓] POST /api/admin/assessors: supabaseAdmin.auth.admin.createUser
+    (was incorrectly using anon client)
+[✓] Migration: REVOKE ALL ON verify_certificate_public FROM PUBLIC
+[✓] Migration: GRANT EXECUTE ON verify_certificate_public TO service_role
+[✓] server-auth.ts: improved error messages for 401/403 mapping
+[✓] ZIP: participants/page.tsx included
+[✓] ZIP: public/certificate_template.png included (2.3 MB)
+[✓] ZIP: pinata.ts removed from script
+
+=============================================================
+SECURITY CHECKLIST (FINAL)
+=============================================================
+
+[✓] mintCertificate matches backend ABI
+[✓] mintCertificate matches MINT_ABI in route.ts
+[✓] args: [address wallet, string ipfsUri] — correct
+[✓] soulbound is permanent constant — cannot be disabled
+[✓] setSoulbound removed — no backdoor
+[✓] Transfer blocked: _beforeTokenTransfers hardcoded
+[✓] approve() reverts
+[✓] setApprovalForAll() reverts
+[✓] isApprovedForAll() returns false
+[✓] adminBurn() — owner-only, for revocation
+[✓] mint is server-side via DEPLOYER_PRIVATE_KEY
+[✓] no MetaMask signing for mint
+[✓] Token ID 0 safe (explicit !== null/undefined/"")
+[✓] verify uses ownerOf + tokenURI + cross-check wallet
+[✓] RLS active — anon cannot write to sensitive tables
+[✓] All writes via service role API routes
+[✓] profil_insert_own RLS DROPPED — no client-side role write
+[✓] profil_update_own RLS DROPPED — no client-side role update
+[✓] handle_new_user: role metadata IGNORED, always 'participant'
+[✓] /api/auth/sync: wallet signature verification (viem verifyMessage)
+[✓] /api/auth/sync: bodyRole NOT used for non-master wallets
+[✓] /api/admin/assessors: POST requires admin Bearer token
+[✓] /api/admin/participants: GET requires admin Bearer token
+[✓] /api/admin/dashboard-summary: GET requires admin Bearer token
+[✓] /api/profile/by-wallet: returns id, wallet_address, full_name ONLY
+[✓] verify_certificate_public: REVOKE PUBLIC, only service_role
+[✓] is_admin: REVOKE PUBLIC, only authenticated
+[✓] Dead endpoints: /api/ipfs/upload-file, upload-json DELETED
+[✓] Dead code: src/lib/pinata.ts DELETED
+[✓] Template: public/certificate_template.png in repo (2.3 MB)
+[✓] .env.example: no hardcoded contract address
+
+=============================================================
+APPLIED TO LIVE SUPABASE (PENDING)
+=============================================================
+
+[ ] Run SQL: DROP POLICY IF EXISTS "profil_insert_own" ON public.profil;
+[ ] Run SQL: DROP POLICY IF EXISTS "profil_update_own" ON public.profil;
+[ ] Run SQL: CREATE/REPLACE handle_new_user (role='participant', search_path)
+[ ] Run SQL: CREATE/REPLACE is_admin (search_path security)
+[ ] Run SQL: CREATE/REPLACE verify_certificate_public
+[ ] Run SQL: REVOKE ALL ON verify_certificate_public FROM PUBLIC
+[ ] Run SQL: GRANT EXECUTE ON verify_certificate_public TO service_role
+
+=============================================================
+GIT COMMITS
+=============================================================
+
+Round 1: 0006580 fix(security): patch 8 fatal issues
+Round 2: 4768882 fix(security): patch round 2 - RLS, assessor flow, dashboard
+Round 3: 2b1fea5 fix(security): round 3 - signature verification, RPC lockdown
+
+=============================================================
+ZIP CONTENTS (49 ENTRIES)
+=============================================================
+
+.env.example
+contracts/SertifikatDigital.sol
+package.json
+tsconfig.json
+public/certificate_template.png (2.3 MB)
+src/app/admin/assessments/page.tsx
+src/app/admin/assessors/page.tsx
+src/app/admin/logs/page.tsx
+src/app/admin/mint/page.tsx
+src/app/admin/mint/[id]/page.tsx
+src/app/admin/participants/page.tsx
+src/app/api/admin/assessments/[id]/assign/route.ts
+src/app/api/admin/assessors/route.ts
+src/app/api/admin/dashboard-summary/route.ts
+src/app/api/admin/mint/route.ts
+src/app/api/admin/participants/route.ts
+src/app/api/admin/preview-certificate/route.ts
+src/app/api/assessor/assessments/[id]/route.ts
+src/app/api/auth/sync/route.ts
+src/app/api/profile/by-wallet/route.ts
+src/app/api/profile/me/route.ts
+src/app/api/public/verify/route.ts
+src/app/assessor/evaluate/[id]/page.tsx
+src/app/participant/assessments/page.tsx
+src/app/participant/assessments/[id]/page.tsx
+src/app/verify/page.tsx
+src/lib/app-config.ts
+src/lib/certificate-renderer.ts
+src/lib/server-auth.ts
+src/lib/status-labels.ts
+src/lib/supabase.ts
+src/lib/thirdweb.ts
+SSDP_AUDIT_LOG.txt
+supabase/migrations/00001_initial_schema.sql
+supabase/migrations/00002_add_portofolio.sql
+
+=============================================================
+END OF AUDIT LOG
+=============================================================

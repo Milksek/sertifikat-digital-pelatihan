@@ -91,11 +91,31 @@ Copy-Safe "supabase\migrations"
 Copy-Safe "public\certificate_template.png"
 
 # Testing & Deploy setup
-$testRoot = Join-Path $root "cert-system-testing"
+$testRoot = Join-Path (Split-Path $root -Parent) "cert-system-testing"
 if (Test-Path $testRoot) {
-    Copy-Safe "cert-system-testing\hardhat.config.js"
-    Copy-Safe "cert-system-testing\1-unit-testing-hardhat"
-    Copy-Safe "cert-system-testing\scripts\deploy.js"
+    $testingRoot = $testRoot
+    
+    $hcSrc = Join-Path $testingRoot "hardhat.config.js"
+    $hcDst = Join-Path $dest "cert-system-testing\hardhat.config.js"
+    $hcDstDir = Split-Path $hcDst -Parent
+    if (!(Test-Path $hcDstDir)) { New-Item -ItemType Directory -Path $hcDstDir -Force | Out-Null }
+    if (Test-Path -LiteralPath $hcSrc) { [System.IO.File]::Copy($hcSrc, $hcDst, $true) }
+    
+    $testSrc = Join-Path $testingRoot "1-unit-testing-hardhat\KompetenIDCertificate.test.js"
+    $testDst = Join-Path $dest "cert-system-testing\1-unit-testing-hardhat\KompetenIDCertificate.test.js"
+    $testDstDir = Split-Path $testDst -Parent
+    if (!(Test-Path $testDstDir)) { New-Item -ItemType Directory -Path $testDstDir -Force | Out-Null }
+    if (Test-Path -LiteralPath $testSrc) { [System.IO.File]::Copy($testSrc, $testDst, $true) }
+    
+    $pkgSrc = Join-Path $testingRoot "package.json"
+    $pkgDst = Join-Path $dest "cert-system-testing\package.json"
+    if (Test-Path -LiteralPath $pkgSrc) { [System.IO.File]::Copy($pkgSrc, $pkgDst, $true) }
+    
+    $deploySrc = Join-Path $testingRoot "scripts\deploy.js"
+    $deployDst = Join-Path $dest "cert-system-testing\scripts\deploy.js"
+    $deployDstDir = Split-Path $deployDst -Parent
+    if (!(Test-Path $deployDstDir)) { New-Item -ItemType Directory -Path $deployDstDir -Force | Out-Null }
+    if (Test-Path -LiteralPath $deploySrc) { [System.IO.File]::Copy($deploySrc, $deployDst, $true) }
 } else {
     Copy-Safe "hardhat.config.js"
     Copy-Safe "hardhat.config.ts"
