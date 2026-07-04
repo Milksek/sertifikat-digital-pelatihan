@@ -19,6 +19,7 @@ import {
   TRAINING_NAME,
 } from "@/lib/app-config";
 import { renderCertificatePng } from "@/lib/certificate-renderer";
+import { requireAdminUser, getAdminClient } from "@/lib/server-auth";
 
 export const runtime = "nodejs";
 
@@ -57,28 +58,7 @@ type Assessment = {
   } | null;
 };
 
-function getAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Supabase server environment belum lengkap.");
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
-}
-
-function getBearerToken(req: NextRequest) {
-  const auth = req.headers.get("authorization") || "";
-  if (!auth.startsWith("Bearer ")) return null;
-  return auth.slice(7);
-}
-
-function getAuthedClient(token: string) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) throw new Error("Supabase auth environment belum lengkap.");
-  return createClient(url, key, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
+// auth helper functions removed - now using server-auth.ts
 
 function normalizePrivateKey(value: string) {
   return (value.startsWith("0x") ? value : `0x${value}`) as `0x${string}`;
@@ -148,29 +128,10 @@ async function uploadImageToPinata(fileName: string, bytes: Buffer) {
   };
 }
 
-async function requireAdminUser(req: NextRequest) {
-  const token = getBearerToken(req);
-  if (!token) throw new Error("Token login admin tidak ditemukan.");
-
-  const authed = getAuthedClient(token);
-  const { data: userData, error: userError } = await authed.auth.getUser();
-  if (userError || !userData.user) throw new Error("Sesi admin tidak valid.");
-
-  const admin = getAdmin();
-  const { data: profile, error: profileError } = await admin
-    .from("profil")
-    .select("id,role,wallet_address,full_name,email")
-    .eq("id", userData.user.id)
-    .maybeSingle();
-
-  if (profileError || !profile) throw new Error("Profil admin tidak ditemukan.");
-  if ((profile as Profile).role !== "admin") throw new Error("Hanya admin yang boleh melakukan mint.");
-
-  return profile as Profile;
-}
+// requireAdminUser function removed - now using server-auth.ts
 
 async function getAssessmentOrThrow(assessmentId: string) {
-  const admin = getAdmin();
+  const admin = getAdminClient();
   const { data, error } = await admin
     .from("penilaian")
     .select(`
@@ -202,7 +163,7 @@ export async function POST(req: NextRequest) {
     }
 
     const assessment = await getAssessmentOrThrow(String(assessmentId));
-    const admin = getAdmin();
+    const admin = getAdminClient();
 
     const existingCertificate = await admin
       .from("sertifikat")

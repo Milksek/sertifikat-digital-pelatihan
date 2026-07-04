@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
       userId = signInResult.data.user.id;
       role = addr === MASTER_WALLET
         ? "admin"
-        : existing?.role ?? bodyRole ?? "participant";
+        : existing?.role ?? "participant";
 
       const profilePayload: any = {
         id: userId,
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
       userId = newUser.user.id;
       role = addr === MASTER_WALLET
         ? "admin"
-        : bodyRole ?? existing?.role ?? "participant";
+        : existing?.role ?? "participant";
       const profilePayload: any = {
         id: userId,
         wallet_address: addr,
@@ -136,10 +136,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (bodyRole || fullName || bodyEmail || phone || nik || addr === MASTER_WALLET) {
+    if (fullName || bodyEmail || phone || nik || addr === MASTER_WALLET) {
       const updatePayload: any = {};
       if (addr === MASTER_WALLET) updatePayload.role = "admin";
-      else if (bodyRole) updatePayload.role = bodyRole;
       if (fullName) updatePayload.full_name = fullName;
       if (bodyEmail) updatePayload.email = bodyEmail;
       if (phone) updatePayload.phone = phone;

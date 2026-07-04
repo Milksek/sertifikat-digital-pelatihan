@@ -1,22 +1,13 @@
-﻿import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { NextRequest, NextResponse } from "next/server";
+import { requireAdminUser } from "@/lib/server-auth";
 
-let _supabaseAdmin = null;
-
-function getAdmin() {
-  if (!_supabaseAdmin) {
-    _supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-      { auth: { autoRefreshToken: false, persistSession: false } },
-    );
-  }
-  return _supabaseAdmin;
-}
-
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabaseAdmin = getAdmin();
+    await requireAdminUser(req);
+
+    const { getAdminClient } = await import("@/lib/server-auth");
+    const supabaseAdmin = getAdminClient();
+
     const { data, error } = await supabaseAdmin
       .from("profil")
       .select("*")
@@ -28,11 +19,12 @@ export async function GET() {
     }
 
     return NextResponse.json({ success: true, assessors: data || [] });
-  } catch (error) {
+  } catch (error: any) {
     console.error("[admin/assessors]", error?.message || error);
+    const status = error.message?.includes("Akses ditolak") ? 403 : error.message?.includes("Token login") ? 401 : 500;
     return NextResponse.json(
       { success: false, error: error?.message || "Gagal memuat asesor" },
-      { status: 500 },
+      { status },
     );
   }
 }

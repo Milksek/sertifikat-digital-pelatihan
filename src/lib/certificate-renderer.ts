@@ -8,6 +8,7 @@ type RenderCertificateInput = {
   trainingField: string;
   issuedAt: string;
   walletAddress: string;
+  verifyUrl?: string;
 };
 
 function escapeSvgText(value: string) {
@@ -55,7 +56,7 @@ function splitName(value: string, maxLength = 28) {
 }
 
 export async function renderCertificatePng(input: RenderCertificateInput) {
-  const templatePath = path.join(process.cwd(), "Tempelate Sertifikat.png");
+  const templatePath = path.join(process.cwd(), "public", "certificate_template.png");
   const template = sharp(templatePath);
   const metadata = await template.metadata();
 

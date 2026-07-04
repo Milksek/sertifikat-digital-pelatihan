@@ -188,6 +188,108 @@ CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
+-- Helper function to check if a user is an admin
+CREATE OR REPLACE FUNCTION public.is_admin(uid UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1
+    FROM public.profil
+    WHERE id = uid
+      AND role = 'admin'
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.is_admin(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_admin(UUID) TO authenticated;
+
+-- RPC untuk verifikasi sertifikat publik dan pencatatan log
+CREATE OR REPLACE FUNCTION public.verify_certificate_public(
+    search_query TEXT,
+    verifier_ip_input TEXT
+)
+RETURNS TABLE (
+    certificate_number TEXT,
+    training_name TEXT,
+    training_field TEXT,
+    participant_wallet TEXT,
+    token_id TEXT,
+    tx_hash TEXT,
+    ipfs_image_uri TEXT,
+    metadata_uri TEXT,
+    status TEXT,
+    minted_at TIMESTAMPTZ,
+    revoked_at TIMESTAMPTZ,
+    revocation_reason TEXT,
+    participant_name TEXT,
+    recommendation TEXT,
+    score JSONB
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    found_cert RECORD;
+BEGIN
+    SELECT 
+        s.id AS cert_id,
+        s.certificate_number,
+        s.training_name,
+        s.training_field,
+        s.participant_wallet,
+        s.token_id,
+        s.tx_hash,
+        s.ipfs_image_uri,
+        s.metadata_uri,
+        s.status,
+        s.minted_at,
+        s.revoked_at,
+        s.revocation_reason,
+        p.full_name AS participant_name,
+        pen.recommendation,
+        pen.score
+    INTO found_cert
+    FROM public.sertifikat s
+    JOIN public.penilaian pen ON s.assessment_id = pen.id
+    JOIN public.profil p ON pen.participant_id = p.id
+    WHERE 
+        LOWER(s.certificate_number) = LOWER(TRIM(search_query))
+        OR LOWER(s.token_id) = LOWER(TRIM(search_query))
+        OR LOWER(s.participant_wallet) = LOWER(TRIM(search_query))
+    LIMIT 1;
+
+    IF found_cert.cert_id IS NOT NULL THEN
+        INSERT INTO public.log_verifikasi (certificate_id, verifier_ip, query)
+        VALUES (found_cert.cert_id, verifier_ip_input, search_query);
+
+        RETURN QUERY SELECT 
+            found_cert.certificate_number,
+            found_cert.training_name,
+            found_cert.training_field,
+            found_cert.participant_wallet,
+            found_cert.token_id,
+            found_cert.tx_hash,
+            found_cert.ipfs_image_uri,
+            found_cert.metadata_uri,
+            found_cert.status,
+            found_cert.minted_at,
+            found_cert.revoked_at,
+            found_cert.revocation_reason,
+            found_cert.participant_name,
+            found_cert.recommendation,
+            found_cert.score;
+    END IF;
+
+    RETURN;
+END;
+$$;
+
 -- ============================================================
 -- ROW LEVEL SECURITY
 -- ============================================================
