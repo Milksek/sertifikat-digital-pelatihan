@@ -210,7 +210,7 @@ export async function POST(req: NextRequest) {
       .eq("assessment_id", assessment.id)
       .maybeSingle();
 
-    if (existingCertificate.data?.token_id && existingCertificate.data?.status !== "revoked") {
+    if (existingCertificate.data?.token_id !== null && existingCertificate.data?.token_id !== undefined && existingCertificate.data?.status !== "revoked") {
       return NextResponse.json({ error: "Sertifikat untuk penilaian ini sudah pernah diterbitkan." }, { status: 409 });
     }
 
