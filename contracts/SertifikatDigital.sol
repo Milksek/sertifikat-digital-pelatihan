@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 import "@thirdweb-dev/contracts/base/ERC721Base.sol";
 
 contract SertifikatDigital is ERC721Base {
-    // Soulbound bersifat permanen dan tidak dapat dinonaktifkan oleh siapapun.
     bool public constant soulbound = true;
 
     constructor(
@@ -17,53 +16,50 @@ contract SertifikatDigital is ERC721Base {
         ERC721Base(_defaultAdmin, _name, _symbol, _royaltyRecipient, _royaltyBps)
     {}
 
-    // ─── Internal helper ──────────────────────────────────────────────────────
     function _mintTo(address recipient, string memory uri) internal {
+        require(recipient != address(0), "Recipient tidak valid");
+        require(bytes(uri).length > 0, "Token URI tidak boleh kosong");
+
         uint256 tokenId = nextTokenIdToMint();
+
         _setTokenURI(tokenId, uri);
         _safeMint(recipient, 1, "");
     }
 
-    // ─── Fungsi utama penerbitan satu sertifikat untuk satu proses minting ─────
     function mintCertificate(address recipient, string calldata uri) external {
         require(msg.sender == owner(), "Not authorized");
+
         _mintTo(recipient, uri);
     }
 
-    // ─── Fungsi batch (legacy, tidak digunakan oleh aplikasi) ─────────────────
-    function batchMintToMultiple(address[] calldata recipients, string[] calldata uris) external {
-        require(msg.sender == owner(), "Not authorized");
-        require(recipients.length == uris.length, "Array lengths must match");
-        for (uint256 i = 0; i < recipients.length; i++) {
-            _mintTo(recipients[i], uris[i]);
-        }
-    }
-
-    // ─── Cabut sertifikat (admin only) ────────────────────────────────────────
     function adminBurn(uint256 tokenId) external {
         require(msg.sender == owner(), "Not authorized");
+
         _burn(tokenId, false);
     }
 
-    // ─── Soulbound guard permanen: blokir transfer antar wallet ───────────────
-    // Tidak dapat dinonaktifkan karena soulbound adalah konstanta.
-    function _beforeTokenTransfers(address from, address to, uint256 startTokenId, uint256 quantity)
+    function _beforeTokenTransfers(
+        address from,
+        address to,
+        uint256 startTokenId,
+        uint256 quantity
+    )
         internal
         override
     {
         super._beforeTokenTransfers(from, to, startTokenId, quantity);
+
         if (from != address(0) && to != address(0)) {
             revert("Sertifikat ini adalah Kredensial Soulbound dan tidak bisa ditransfer");
         }
     }
 
-    // ─── Nonaktifkan semua mekanisme persetujuan transfer ─────────────────────
     function approve(address, uint256) public virtual override(ERC721A, IERC721) {
-        revert("Sertifikat Soulbound: Fungsi persetujuan dinonaktifkan!");
+        revert("Sertifikat Soulbound: Fungsi persetujuan dinonaktifkan");
     }
 
     function setApprovalForAll(address, bool) public virtual override(ERC721A, IERC721) {
-        revert("Sertifikat Soulbound: Delegasi dinonaktifkan!");
+        revert("Sertifikat Soulbound: Delegasi dinonaktifkan");
     }
 
     function isApprovedForAll(address, address) public view virtual override(ERC721A, IERC721) returns (bool) {
