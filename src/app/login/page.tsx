@@ -80,7 +80,6 @@ function RegisterPopup({
           email: form.email,
           phone: form.phone,
           nik: form.nik,
-          role: form.roleType,
         }),
       });
       const result = await res.json().catch(() => ({ error: "Gagal menyimpan" }));

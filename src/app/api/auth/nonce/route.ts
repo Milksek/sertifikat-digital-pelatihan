@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { randomBytes } from "node:crypto";
 
+const NONCE_TTL_MS = 5 * 60 * 1000;
+
 let _supabaseAdmin: ReturnType<typeof createClient> | null = null;
 
 function getAdmin() {
@@ -25,18 +27,22 @@ export async function GET(req: NextRequest) {
     const nonce = randomBytes(16).toString("hex");
     const timestamp = new Date().toISOString();
     const message = `SSDP Login\nWallet: ${addr}\nNonce: ${nonce}\nTimestamp: ${timestamp}`;
+    const expiresAt = new Date(Date.now() + NONCE_TTL_MS).toISOString();
     const supabaseAdmin = getAdmin();
 
+    // Store nonce in dedicated auth_nonces table
     const { error } = await supabaseAdmin
-      .from("profil")
-      .update({ nonce, nonce_timestamp: timestamp })
-      .eq("wallet_address", addr);
+      .from("auth_nonces")
+      .upsert({
+        wallet_address: addr,
+        nonce,
+        message,
+        expires_at: expiresAt,
+      }, { onConflict: "wallet_address" });
 
     if (error) {
-      const { data: existing } = await supabaseAdmin.from("profil").select("id").eq("wallet_address", addr).maybeSingle();
-      if (!existing) {
-        await supabaseAdmin.from("profil").insert({ id: crypto.randomUUID(), wallet_address: addr, role: "participant", nonce, nonce_timestamp: timestamp });
-      }
+      console.error("[auth/nonce] upsert error:", error.message);
+      return NextResponse.json({ error: "Gagal menyimpan nonce." }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, message, nonce, timestamp });

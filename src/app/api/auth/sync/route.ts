@@ -69,12 +69,17 @@ export async function POST(req: NextRequest) {
     const supabaseAdmin = getAdmin();
     const supabaseAuth = getAuthClient();
 
-    // Verify wallet signature — prevents impersonation
-    const valid = await verifyMessage({
-      address: walletAddress as `0x${string}`,
-      message,
-      signature: signature as `0x${string}`,
-    });
+    // Verify wallet signature (try-catch for malformed hex)
+    let valid = false;
+    try {
+      valid = await verifyMessage({
+        address: addr as `0x${string}`,
+        message,
+        signature: signature as `0x${string}`,
+      });
+    } catch {
+      valid = false;
+    }
     if (!valid) {
       return NextResponse.json(
         { error: "Signature wallet tidak valid." },
@@ -94,17 +99,24 @@ export async function POST(req: NextRequest) {
     }
 
     const nonce = nonceMatch[1];
-    const timestamp = new Date(timestampMatch[1]).getTime();
-    if (Date.now() - timestamp > NONCE_TTL_MS) {
-      return NextResponse.json({ error: "Signature sudah kedaluwarsa (maks 5 menit)." }, { status: 401 });
-    }
+    
+    // Validate nonce from auth_nonces table
+    const { data: nonceRow } = await supabaseAdmin
+      .from("auth_nonces")
+      .select("nonce, message, expires_at")
+      .eq("wallet_address", addr)
+      .maybeSingle();
 
-    const { data: profileData } = await supabaseAdmin.from("profil").select("nonce").eq("wallet_address", addr).maybeSingle();
-    if (!profileData || profileData.nonce !== nonce) {
+    if (!nonceRow || nonceRow.nonce !== nonce || nonceRow.message !== message) {
       return NextResponse.json({ error: "Nonce tidak valid atau sudah dipakai." }, { status: 401 });
     }
 
-    await supabaseAdmin.from("profil").update({ nonce: null, nonce_timestamp: null }).eq("wallet_address", addr);
+    if (new Date(nonceRow.expires_at).getTime() < Date.now()) {
+      return NextResponse.json({ error: "Nonce sudah kedaluwarsa." }, { status: 401 });
+    }
+
+    // Delete nonce (single-use)
+    await supabaseAdmin.from("auth_nonces").delete().eq("wallet_address", addr);
 
     const syntheticEmail = `${addr.slice(2)}@wallet.local`;
     let { data: existing } = (await supabaseAdmin
@@ -116,17 +128,21 @@ export async function POST(req: NextRequest) {
     let userId: string;
     let role: string;
     const sessionPassword = generateSessionPassword();
-    let signInResult = await supabaseAuth.auth.signInWithPassword({
-      email: syntheticEmail,
-      password: sessionPassword,
-    });
-
-    if (signInResult.data.session?.access_token && signInResult.data.user) {
-      userId = signInResult.data.user.id;
+    let signInResult;
+    if (existing?.id) {
+      // Fatal 1: Update password of existing user before sign-in
+      await supabaseAdmin.auth.admin.updateUserById(existing.id, {
+        password: sessionPassword,
+        user_metadata: { wallet_address: addr },
+      });
+      signInResult = await supabaseAuth.auth.signInWithPassword({
+        email: syntheticEmail,
+        password: sessionPassword,
+      });
+      userId = existing.id;
       role = addr === MASTER_WALLET
         ? "admin"
-        : existing?.role ?? "participant";
-
+        : existing.role ?? "participant";
       const profilePayload: any = {
         id: userId,
         wallet_address: addr,
@@ -136,11 +152,8 @@ export async function POST(req: NextRequest) {
       if (bodyEmail) profilePayload.email = bodyEmail;
       if (phone) profilePayload.phone = phone;
       if (nik) profilePayload.nik = nik;
-
       await writeProfileOrThrow(
-        (supabaseAdmin.from("profil") as any).upsert(profilePayload, {
-          onConflict: "id",
-        }),
+        (supabaseAdmin.from("profil") as any).upsert(profilePayload, { onConflict: "id" }),
         "Gagal upsert profil pengguna existing",
       );
       existing = { ...existing, ...profilePayload };
