@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { Home, ArrowLeft, AlertCircle, ShieldOff, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -95,3 +95,4 @@ export function ErrorState({
     </div>
   );
 }
+

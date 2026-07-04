@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 export default function ParticipantLayout({
   children,
@@ -9,3 +9,4 @@ export default function ParticipantLayout({
     <DashboardLayout allowedRoles={["participant"]}>{children}</DashboardLayout>
   );
 }
+

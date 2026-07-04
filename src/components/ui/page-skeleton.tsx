@@ -1,4 +1,4 @@
-import { Skeleton } from "@/components/ui/skeleton";
+﻿import { Skeleton } from "@/components/ui/skeleton";
 
 export function TablePageSkeleton({
   rows = 5,
@@ -156,3 +156,4 @@ export function DashboardSkeleton({
     </div>
   );
 }
+

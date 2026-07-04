@@ -1,6 +1,5 @@
 "use client";
 import { Sidebar } from "./sidebar";
-import { RoleGuard } from "./role-guard";
 import { Role } from "../providers/auth-provider";
 import { Loader2 } from "lucide-react";
 import { Suspense } from "react";
@@ -10,24 +9,25 @@ interface DashboardLayoutProps {
 }
 export function DashboardLayout({
   children,
-  allowedRoles,
+  allowedRoles: _allowedRoles,
 }: DashboardLayoutProps) {
   return (
-    <RoleGuard allowedRoles={allowedRoles}>
-      <div className="min-h-screen bg-slate-50">
-        <Sidebar />
-        <main className="md:ml-64 p-8 min-h-screen transition-all">
+    <div className="min-h-screen bg-slate-100/80">
+      <Sidebar />
+      <main className="min-h-screen md:ml-64">
+        <div className="mx-auto w-full max-w-[1480px] px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8 xl:px-10">
           <Suspense
             fallback={
-              <div className="flex h-full w-full justify-center mt-20">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+              <div className="flex min-h-[40vh] w-full items-center justify-center rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <Loader2 className="h-8 w-8 animate-spin text-slate-500" />
               </div>
             }
           >
             {children}
           </Suspense>
-        </main>
-      </div>
-    </RoleGuard>
+        </div>
+      </main>
+    </div>
   );
 }
+

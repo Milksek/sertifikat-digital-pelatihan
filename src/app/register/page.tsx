@@ -57,7 +57,7 @@ export default function RegisterPage() {
     try {
       setIsSubmitting(true);
       const { error } = await supabase
-        .from("profiles")
+        .from("profil")
         .update({
           full_name: formData.fullName,
           email: formData.email,
@@ -68,6 +68,16 @@ export default function RegisterPage() {
         .eq("id", user.id);
       if (error) throw error;
       toast.success("Registrasi berhasil!");
+      const updatedProfile = {
+        ...user,
+        full_name: formData.fullName,
+        email: formData.email,
+        phone: formData.phone,
+        nik: formData.nik,
+        role: "participant",
+      };
+      localStorage.setItem("ssdp_profile", JSON.stringify(updatedProfile));
+      localStorage.setItem("ssdp_role", "participant");
       window.location.href = "/participant/dashboard";
     } catch (error: unknown) {
       console.error(error);
@@ -197,3 +207,4 @@ export default function RegisterPage() {
     </div>
   );
 }
+

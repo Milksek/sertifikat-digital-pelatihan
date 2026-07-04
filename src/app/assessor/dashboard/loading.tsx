@@ -1,4 +1,4 @@
-import { Skeleton } from "@/components/ui/skeleton";
+﻿import { Skeleton } from "@/components/ui/skeleton";
 export default function AssessorDashboardLoading() {
   return (
     <div className="p-6 space-y-6">
@@ -33,3 +33,4 @@ export default function AssessorDashboardLoading() {
     </div>
   );
 }
+

@@ -1,252 +1,72 @@
 "use client";
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { APP_NAME, TRAINING_NAME } from "@/lib/app-config";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { DashboardSkeleton } from "@/components/ui/page-skeleton";
-import {
-  FileCheck,
-  Activity,
-  ClipboardList,
-  CheckCircle2,
-  Clock,
-  ArrowRight,
-  ChevronRight,
-  Star,
-} from "lucide-react";
-import Link from "next/link";
-import { format } from "date-fns";
-import { id as idLocale } from "date-fns/locale";
-const globalAssessorStatsCache: Record<string, any> = {};
-const globalAssessorRecentCache: Record<string, any[]> = {};
-export default function AssessorDashboard() {
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ArrowRight, CheckCircle2, ClipboardList, Clock, FileCheck, ShieldCheck } from "lucide-react";
+import { getAssessmentStatusBadgeClass, getAssessmentStatusLabel } from "@/lib/status-labels";
+
+type PenilaianRow = { id: string; status: string | null; created_at: string; participant?: { full_name?: string | null; email?: string | null } | null; };
+type DashboardData = { totalAssigned: number; pending: number; inProgress: number; evaluated: number; approved: number; recent: PenilaianRow[]; };
+const initialData: DashboardData = { totalAssigned: 0, pending: 0, inProgress: 0, evaluated: 0, approved: 0, recent: [] };
+
+export default function AssessorDashboardPage() {
   const { user } = useAuth();
-  const cacheKey = user?.id || "guest";
-  const [stats, setStats] = useState(
-    globalAssessorStatsCache[cacheKey] || {
-      pending: 0,
-      completed: 0,
-      kompeten: 0,
-    },
-  );
-  const [recentPending, setRecentPending] = useState<any[]>(
-    globalAssessorRecentCache[cacheKey] || [],
-  );
-  const [loading, setLoading] = useState(!globalAssessorStatsCache[cacheKey]);
+  const [data, setData] = useState<DashboardData>(initialData);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    async function fetchStats() {
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-      const key = user.id;
-      if (!globalAssessorStatsCache[key]) setLoading(true);
+    let mounted = true;
+    async function load() {
+      if (!user?.id) { if (mounted) { setData(initialData); setLoading(false); } return; }
       try {
-        const pendingRes = await supabase
-          .from("assessments")
-          .select("*", { count: "exact", head: true })
-          .eq("assessor_id", user.id)
-          .in("status", ["pending", "in_progress"]);
-        const completedRes = await supabase
-          .from("assessments")
-          .select("*", { count: "exact", head: true })
-          .eq("assessor_id", user.id)
-          .in("status", ["evaluated", "approved", "rejected"]);
-        const kompetenRes = await supabase
-          .from("assessments")
-          .select("*", { count: "exact", head: true })
-          .eq("assessor_id", user.id)
-          .like("recommendation", "Kompeten%");
-        const pendingDataRes = await supabase
-          .from("assessments")
-          .select(
-            "id, status, created_at, competency_schemes(name), profiles!participant_id(full_name)",
-          )
-          .in("status", ["pending", "in_progress"])
-          .eq("assessor_id", user.id)
-          .order("created_at", { ascending: true })
-          .limit(4);
-        const newStats = {
-          pending: pendingRes.count || 0,
-          completed: completedRes.count || 0,
-          kompeten: kompetenRes.count || 0,
-        };
-        setStats(newStats);
-        globalAssessorStatsCache[key] = newStats;
-        if (pendingDataRes.data) {
-          setRecentPending(pendingDataRes.data);
-          globalAssessorRecentCache[key] = pendingDataRes.data;
-        }
-      } catch (e) {
-        console.error("Dashboard fetch error:", e);
-      } finally {
-        setLoading(false);
-      }
+        const { data: rows } = await supabase.from("penilaian").select("id, status, created_at, participant:profil!participant_id(full_name, email)").eq("assessor_id", user.id).order("created_at", { ascending: false }).limit(50);
+        if (!mounted) return;
+        const all = (rows as PenilaianRow[]) || [];
+        const recent = all.slice(0, 8);
+        setData({ totalAssigned: all.length, pending: all.filter((r) => r.status === "pending").length, inProgress: all.filter((r) => r.status === "in_progress").length, evaluated: all.filter((r) => r.status === "evaluated").length, approved: all.filter((r) => r.status === "approved" || r.status === "certified").length, recent });
+      } finally { if (mounted) setLoading(false); }
     }
-    fetchStats();
-  }, [user]);
-  const firstName = user?.full_name?.split(" ")[0] || "Asesor";
-  if (loading) return <DashboardSkeleton stats={3} />;
+    load();
+    return () => { mounted = false; };
+  }, [user?.id]);
+
+  const kpis = useMemo(() => [
+    { label: "Total Ditugaskan", value: data.totalAssigned, icon: ClipboardList, tone: "border-slate-200 bg-slate-50 text-slate-700", note: "Semua penilaian yang menjadi tanggung jawab kamu" },
+    { label: "Sedang Dinilai", value: data.inProgress, icon: Clock, tone: "border-blue-100 bg-blue-50 text-blue-700", note: "Masih aktif diproses" },
+    { label: "Sudah Dinilai", value: data.evaluated, icon: FileCheck, tone: "border-violet-100 bg-violet-50 text-violet-700", note: "Sudah punya hasil evaluasi" },
+    { label: "Lulus / Terbit", value: data.approved, icon: CheckCircle2, tone: "border-emerald-100 bg-emerald-50 text-emerald-700", note: "Lulus atau sudah diterbitkan" },
+  ], [data]);
+
   return (
-    <div className="space-y-8">
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-900 via-blue-900 to-slate-900 p-8 text-white shadow-lg">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute -top-10 -right-10 w-72 h-72 rounded-full bg-indigo-400 blur-3xl" />
-          <div className="absolute -bottom-10 -left-10 w-72 h-72 rounded-full bg-blue-400 blur-3xl" />
-        </div>
-        <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Star className="w-4 h-4 text-yellow-400" />
-              <span className="text-sm text-blue-300 font-medium">
-                Portal Asesor
-              </span>
-            </div>
-            <h1 className="text-3xl font-bold">Halo, {firstName} 👋</h1>
-            <p className="text-blue-300 mt-2 text-sm">
-              {stats.pending > 0
-                ? `Ada ${stats.pending} peserta menunggu penilaian Anda.`
-                : "Semua evaluasi sudah selesai. Kerja bagus!"}
-            </p>
+    <div className="space-y-6">
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-4">
+            <Badge className="w-fit rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-[11px] font-semibold tracking-[0.18em] text-indigo-700 hover:bg-indigo-50">Dashboard Asesor</Badge>
+            <div><h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">{APP_NAME}</h1><p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">Pantau penilaian peserta yang sudah ditugaskan ke akun kamu untuk pelatihan <span className="font-semibold text-slate-900">{TRAINING_NAME}</span>.</p></div>
           </div>
-          <Link href="/assessor/evaluations">
-            <Button className="bg-white text-indigo-900 hover:bg-blue-50 font-semibold gap-2 shrink-0">
-              Mulai Evaluasi <ArrowRight className="w-4 h-4" />
-            </Button>
-          </Link>
+          <div className="grid gap-3 sm:grid-cols-2 lg:w-[420px]"><div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Peran</p><div className="mt-2 flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-indigo-600" /><p className="text-sm font-semibold text-slate-950">Asesor</p></div><p className="mt-1 text-xs text-slate-500">{user?.full_name || user?.email || "Pengguna asesor"}</p></div><div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Ringkasan</p><p className="mt-2 text-sm font-semibold text-slate-950">{loading ? "Memuat..." : `${data.totalAssigned} penilaian masuk ke akun kamu`}</p><p className="mt-1 text-xs leading-6 text-slate-500">Fokus utama ada di penilaian aktif dan penilaian yang sudah selesai dinilai.</p></div></div>
         </div>
-      </div>
-      <div className="grid gap-5 md:grid-cols-3">
-        <Link href="/assessor/evaluations">
-          <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 border-slate-200 cursor-pointer">
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle className="text-sm font-medium text-slate-500">
-                Menunggu Evaluasi
-              </CardTitle>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center shadow-sm">
-                <Activity className="h-5 w-5 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-4xl font-extrabold text-slate-800 mb-1">
-                {stats.pending}
-              </div>
-              <div className="text-xs font-medium text-orange-600 flex items-center gap-1">
-                Perlu ditindaklanjuti{" "}
-                <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/assessor/completed">
-          <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 border-slate-200 cursor-pointer">
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle className="text-sm font-medium text-slate-500">
-                Evaluasi Selesai
-              </CardTitle>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center shadow-sm">
-                <FileCheck className="h-5 w-5 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-4xl font-extrabold text-slate-800 mb-1">
-                {stats.completed}
-              </div>
-              <div className="text-xs font-medium text-blue-600 flex items-center gap-1">
-                Lihat riwayat{" "}
-                <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        <Card className="border-slate-200">
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="text-sm font-medium text-slate-500">
-              Peserta Kompeten
-            </CardTitle>
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center shadow-sm">
-              <CheckCircle2 className="h-5 w-5 text-white" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-extrabold text-slate-800 mb-1">
-              {stats.kompeten}
-            </div>
-            <div className="text-xs font-medium text-emerald-600">
-              Total dinyatakan kompeten
-            </div>
-          </CardContent>
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {kpis.map((kpi) => { const Icon = kpi.icon; return <Card key={kpi.label} className="border-slate-200 shadow-sm"><CardContent className="p-5"><div className="flex items-start justify-between gap-4"><div><p className="text-sm font-semibold text-slate-500">{kpi.label}</p><p className="mt-2 text-4xl font-semibold tracking-tight text-slate-950">{loading ? "..." : kpi.value}</p><p className="mt-2 text-xs leading-6 text-slate-500">{kpi.note}</p></div><div className={`rounded-2xl border p-3 ${kpi.tone}`}><Icon className="h-5 w-5" /></div></div></CardContent></Card>; })}
+      </section>
+
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.6fr)_360px]">
+        <Card className="border-slate-200 shadow-sm">
+          <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><CardTitle className="text-xl text-slate-950">Penilaian Terbaru</CardTitle><p className="mt-1 text-sm text-slate-500">Daftar penilaian terbaru yang saat ini ditugaskan ke akun kamu.</p></div><Button asChild variant="outline" className="rounded-xl border-slate-200"><Link href="/assessor/evaluations">Semua penilaian <ArrowRight className="ml-2 h-4 w-4" /></Link></Button></CardHeader>
+          <CardContent>{loading ? <div className="rounded-2xl border border-slate-200 px-4 py-10 text-center text-slate-500">Memuat data penilaian...</div> : data.recent.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-6 py-12 text-center"><p className="text-sm font-semibold text-slate-900">Belum ada penilaian masuk</p><p className="mt-2 text-sm leading-6 text-slate-500">Begitu admin menugaskan penilaian ke akun kamu, daftar terbaru akan tampil di sini.</p></div> : <div className="overflow-hidden rounded-2xl border border-slate-200"><Table><TableHeader className="bg-slate-50"><TableRow><TableHead>Peserta</TableHead><TableHead>Status</TableHead><TableHead>Waktu</TableHead></TableRow></TableHeader><TableBody>{data.recent.map((item) => <TableRow key={item.id}><TableCell><p className="font-semibold text-slate-900">{item.participant?.full_name || "Peserta"}</p><p className="text-xs text-slate-400">{item.participant?.email || "-"}</p></TableCell><TableCell><Badge variant="outline" className={getAssessmentStatusBadgeClass(item.status)}>{getAssessmentStatusLabel(item.status)}</Badge></TableCell><TableCell className="whitespace-nowrap text-xs text-slate-500">{new Date(item.created_at).toLocaleString("id-ID")}</TableCell></TableRow>)}</TableBody></Table></div>}</CardContent>
         </Card>
-      </div>
-      <Card className="border-slate-200">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base font-semibold text-slate-800">
-            Antrian Evaluasi
-          </CardTitle>
-          <Link href="/assessor/evaluations">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-blue-600 hover:text-blue-700 gap-1 text-xs"
-            >
-              Lihat semua <ArrowRight className="w-3 h-3" />
-            </Button>
-          </Link>
-        </CardHeader>
-        <CardContent className="p-0">
-          {recentPending.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <ClipboardList className="w-10 h-10 text-slate-200 mb-3" />
-              <p className="text-sm text-slate-500">
-                Tidak ada peserta yang menunggu.
-              </p>
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {recentPending.map((a) => (
-                <div
-                  key={a.id}
-                  className="flex items-center justify-between px-6 py-4 hover:bg-slate-50 transition-colors"
-                >
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">
-                      {(a.profiles as any)?.full_name || "—"}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      {(a.competency_schemes as any)?.name} ·{" "}
-                      {format(new Date(a.created_at), "dd MMM yyyy", {
-                        locale: idLocale,
-                      })}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {a.status === "in_progress" ? (
-                      <Badge className="bg-blue-100 text-blue-700 border-blue-200 gap-1 text-xs">
-                        <Clock className="w-3 h-3" /> Dalam Proses
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="gap-1 text-xs">
-                        <Clock className="w-3 h-3" /> Menunggu
-                      </Badge>
-                    )}
-                    <Link href={`/assessor/evaluate/${a.id}`}>
-                      <Button
-                        size="sm"
-                        className="bg-blue-600 hover:bg-blue-700 h-7 text-xs"
-                      >
-                        Evaluasi
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+
+        <Card className="border-slate-200 shadow-sm"><CardHeader><CardTitle className="text-xl text-slate-950">Panduan Singkat</CardTitle><p className="mt-1 text-sm text-slate-500">Alur kerja asesor tetap sama, hanya tampilannya yang dirapikan.</p></CardHeader><CardContent className="space-y-3"><div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><p className="text-sm font-semibold text-slate-950">1. Terima penugasan</p><p className="mt-1 text-xs leading-6 text-slate-500">Admin menugaskan penilaian ke akun asesor.</p></div><div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><p className="text-sm font-semibold text-slate-950">2. Nilai peserta</p><p className="mt-1 text-xs leading-6 text-slate-500">Ubah hasil sesuai evaluasi dari halaman detail penilaian.</p></div><div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><p className="text-sm font-semibold text-slate-950">3. Lanjut ke admin</p><p className="mt-1 text-xs leading-6 text-slate-500">Jika peserta lulus, admin melanjutkan ke tahap penerbitan sertifikat.</p></div><Button asChild className="w-full rounded-xl bg-slate-950 text-white hover:bg-slate-800"><Link href="/assessor/evaluations">Buka Penilaian Aktif <ArrowRight className="ml-2 h-4 w-4" /></Link></Button></CardContent></Card>
+      </section>
     </div>
   );
 }

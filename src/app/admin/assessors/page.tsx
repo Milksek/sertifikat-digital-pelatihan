@@ -1,6 +1,5 @@
-"use client";
+﻿"use client";
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import {
   Table,
   TableBody,
@@ -52,16 +51,30 @@ export default function AdminAssessors() {
 
   const fetchUsers = async () => {
     if (!globalAssessorsCache) setLoading(true);
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("role", "assessor")
-      .order("created_at", { ascending: false });
-    if (data) {
-      setUsers(data);
-      globalAssessorsCache = data;
+
+    try {
+      const res = await fetch("/api/admin/assessors", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+      });
+      const payload = await res.json();
+
+      if (!res.ok || !payload.success) {
+        throw new Error(payload.error || `Gagal memuat asesor (HTTP ${res.status})`);
+      }
+
+      const assessors = payload.assessors || [];
+      setUsers(assessors);
+      globalAssessorsCache = assessors;
+    } catch (error: any) {
+      console.error("Failed to fetch assessors:", error);
+      setUsers([]);
+      globalAssessorsCache = [];
+      toast.error(error?.message || "Gagal memuat daftar asesor");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -72,7 +85,7 @@ export default function AdminAssessors() {
     const newRole = currentRole === "assessor" ? "participant" : "assessor";
     try {
       const { error } = await supabase
-        .from("profiles")
+        .from("profil")
         .update({ role: newRole })
         .eq("id", userId);
       if (error) throw error;
@@ -116,7 +129,9 @@ export default function AdminAssessors() {
         }),
       });
       const syncData = await res.json();
-      if (!syncData.success) throw new Error(syncData.error || "Gagal membuat akun");
+      if (!res.ok || !syncData.success) {
+        throw new Error(syncData.error || `Gagal membuat akun (HTTP ${res.status})`);
+      }
 
       toast.success(`Akun asesor untuk ${form.fullName} berhasil dibuat!`);
       setForm({ walletAddress: "", fullName: "", email: "", phone: "" });
@@ -250,12 +265,12 @@ export default function AdminAssessors() {
                     <p className="text-xs text-slate-400">{u.email}</p>
                   </TableCell>
                   <TableCell className="font-mono text-xs text-slate-600">
-                    {u.nik || "—"}
+                    {u.nik || ","}
                   </TableCell>
                   <TableCell className="font-mono text-xs text-slate-500">
                     {u.wallet_address
                       ? `${u.wallet_address.slice(0, 6)}...${u.wallet_address.slice(-4)}`
-                      : "—"}
+                      : ","}
                   </TableCell>
                   <TableCell>
                     <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200 gap-1">
@@ -403,3 +418,5 @@ export default function AdminAssessors() {
     </div>
   );
 }
+
+

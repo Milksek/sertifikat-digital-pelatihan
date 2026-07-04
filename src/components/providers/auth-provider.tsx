@@ -7,6 +7,7 @@ import {
   useDisconnect,
 } from "thirdweb/react";
 import { useRouter } from "next/navigation";
+const MASTER_WALLET = "0x1cb90a414ade635dcfa78e41a825c789edde4d8e";
 export type Role = "participant" | "assessor" | "admin" | null;
 interface UserProfile {
   id: string;
@@ -29,61 +30,90 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   logout: () => {},
 });
+function normalizeProfile(profile: UserProfile | null): UserProfile | null {
+  if (!profile) return null;
+  if (profile.wallet_address?.toLowerCase() === MASTER_WALLET) {
+    return { ...profile, role: "admin" };
+  }
+  return profile;
+}
 async function fetchProfileById(id: string): Promise<UserProfile | null> {
   const { data } = await supabase
-    .from("profiles")
+    .from("profil")
     .select("*")
     .eq("id", id)
     .maybeSingle();
-  return data as UserProfile | null;
+  return normalizeProfile(data as UserProfile | null);
 }
 async function fetchProfileByWallet(
   wallet: string,
 ): Promise<UserProfile | null> {
   const { data } = await supabase
-    .from("profiles")
+    .from("profil")
     .select("*")
     .eq("wallet_address", wallet.toLowerCase())
     .maybeSingle();
-  return data as UserProfile | null;
+  return normalizeProfile(data as UserProfile | null);
 }
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [role, setRole] = useState<Role>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<UserProfile | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const cached = localStorage.getItem("ssdp_profile");
+      return cached ? normalizeProfile(JSON.parse(cached)) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [role, setRole] = useState<Role>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const cached = localStorage.getItem("ssdp_profile");
+      if (cached) {
+        const parsed = normalizeProfile(JSON.parse(cached));
+        return (parsed?.role ?? localStorage.getItem("ssdp_role")) as Role;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  });
+  const [isLoading, setIsLoading] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return !localStorage.getItem("ssdp_profile");
+  });
+  const cachedProfileRef = React.useRef(user);
   const account = useActiveAccount();
   const activeWallet = useActiveWallet();
   const { disconnect } = useDisconnect();
   const router = useRouter();
   useEffect(() => {
     let mounted = true;
-    const cachedProfile = localStorage.getItem("kompetenid_profile");
-    if (cachedProfile && mounted) {
-      try {
-        const parsed = JSON.parse(cachedProfile);
-        setUser(parsed);
-        setRole(localStorage.getItem("kompetenid_role") as Role);
-        setIsLoading(false);
-      } catch (e) {}
-    }
     const loadProfile = async (profile: UserProfile | null) => {
       if (!mounted) return;
-      if (profile) {
-        setUser(profile);
-        setRole(profile.role as Role);
-        localStorage.setItem("kompetenid_profile", JSON.stringify(profile));
-        localStorage.setItem("kompetenid_role", profile.role as string);
+      const normalizedProfile = normalizeProfile(profile);
+      if (normalizedProfile) {
+        setUser(normalizedProfile);
+        setRole(normalizedProfile.role as Role);
+        localStorage.setItem("ssdp_profile", JSON.stringify(normalizedProfile));
+        localStorage.setItem("ssdp_role", normalizedProfile.role as string);
       } else {
         setUser(null);
         setRole(null);
-        localStorage.removeItem("kompetenid_profile");
-        localStorage.removeItem("kompetenid_role");
+        localStorage.removeItem("ssdp_profile");
+        localStorage.removeItem("ssdp_role");
       }
       setIsLoading(false);
     };
+    const cachedProfile = cachedProfileRef.current;
+    const redirectToLogin = () => {
+      if (window.location.pathname !== "/login") {
+        window.location.replace("/login");
+      }
+    };
     const checkSession = async () => {
       if (!cachedProfile) setIsLoading(true);
-      const token = localStorage.getItem("kompetenid_token");
+      const token = localStorage.getItem("ssdp_token");
       if (token) {
         try {
           const base64Url = token.split(".")[1];
@@ -109,7 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const userId = payload.sub;
           if (userId) {
             const { data, error } = await getAuthenticatedClient(token)
-              .from("profiles")
+              .from("profil")
               .select("*")
               .eq("id", userId)
               .maybeSingle();
@@ -117,11 +147,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (data && !error) {
               loadProfile(data as UserProfile);
               return;
-            } else {
-              if (cachedProfile) {
-                setIsLoading(false);
-                return;
-              }
+            }
+            if (cachedProfile) {
+              setIsLoading(false);
+              return;
             }
           }
         } catch (e) {
@@ -132,16 +161,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
       }
+      if (cachedProfile) {
+        setIsLoading(false);
+        return;
+      }
       loadProfile(null);
     };
     checkSession();
     const handleAuthChange = () => {
       if (mounted) checkSession();
     };
-    window.addEventListener("kompetenid_auth_change", handleAuthChange);
+    const handleStorage = (event: StorageEvent) => {
+      if (
+        event.key === null ||
+        event.key === "ssdp_token" ||
+        event.key === "ssdp_profile" ||
+        event.key === "ssdp_role"
+      ) {
+        const hasToken = Boolean(localStorage.getItem("ssdp_token"));
+        const hasProfile = Boolean(localStorage.getItem("ssdp_profile"));
+        if (!hasToken && !hasProfile) {
+          redirectToLogin();
+        }
+      }
+    };
+    const originalClear = Storage.prototype.clear;
+    Storage.prototype.clear = function clearPatched() {
+      originalClear.call(this);
+      window.dispatchEvent(new StorageEvent("storage", { key: null }));
+      redirectToLogin();
+    };
+    const originalRemoveItem = Storage.prototype.removeItem;
+    Storage.prototype.removeItem = function removeItemPatched(key: string) {
+      originalRemoveItem.call(this, key);
+      if (key === "ssdp_token" || key === "ssdp_profile" || key === "ssdp_role") {
+        window.dispatchEvent(new StorageEvent("storage", { key }));
+      }
+    };
+    window.addEventListener("ssdp_auth_change", handleAuthChange);
+    window.addEventListener("storage", handleStorage);
     return () => {
       mounted = false;
-      window.removeEventListener("kompetenid_auth_change", handleAuthChange);
+      Storage.prototype.clear = originalClear;
+      Storage.prototype.removeItem = originalRemoveItem;
+      window.removeEventListener("ssdp_auth_change", handleAuthChange);
+      window.removeEventListener("storage", handleStorage);
     };
   }, []);
   const logout = () => {
@@ -150,9 +214,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.error("Thirdweb disconnect error:", e);
     }
-    localStorage.removeItem("kompetenid_token");
-    localStorage.removeItem("kompetenid_profile");
-    localStorage.removeItem("kompetenid_role");
+    localStorage.removeItem("ssdp_token");
+    localStorage.removeItem("ssdp_profile");
+    localStorage.removeItem("ssdp_role");
     window.location.href = "/login";
   };
   return (
@@ -162,3 +226,5 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 export const useAuth = () => useContext(AuthContext);
+
+

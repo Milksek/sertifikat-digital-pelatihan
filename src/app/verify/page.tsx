@@ -1,735 +1,331 @@
 "use client";
-import { useState, useRef, useCallback, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { resolveScheme } from "thirdweb/storage";
-import { client } from "@/lib/thirdweb";
-import { format, addYears } from "date-fns";
-import { id as idLocale } from "date-fns/locale";
+import { APP_NAME, TRAINING_FIELD, TRAINING_NAME } from "@/lib/app-config";
 import {
-  Search,
-  ShieldCheck,
-  ShieldBan,
-  Award,
-  ExternalLink,
-  Printer,
-  QrCode,
-  X,
-  Camera,
-  Copy,
-  Calendar,
-  User,
-  BookOpen,
-  Hash,
-  CheckCircle2,
-  AlertTriangle,
-  Lock,
-  Unlock,
+  Award, ExternalLink, Search, ShieldCheck, ShieldQuestion, ShieldX, Wifi, WifiOff, FileCheck2,
 } from "lucide-react";
-import { toast } from "sonner";
-type VerifyState = "idle" | "loading" | "valid" | "revoked" | "not_found";
-export default function VerifyPage() {
+
+type OnChainResult = {
+  checked: boolean;
+  owner_match: boolean | null;
+  on_chain_owner: string | null;
+  token_uri: string | null;
+  error: string | null;
+  tx_hash?: string | null;
+};
+
+type VerifyResult = {
+  certificate_number: string;
+  training_name: string;
+  training_field: string;
+  participant_wallet: string;
+  token_id: string | null;
+  tx_hash: string | null;
+  ipfs_image_uri: string | null;
+  metadata_uri: string | null;
+  status: string;
+  minted_at: string | null;
+  revoked_at: string | null;
+  revocation_reason: string | null;
+  participant_name: string | null;
+  recommendation: string | null;
+  score: Record<string, unknown> | null;
+  on_chain: OnChainResult | null;
+};
+
+const statusLabel = (s: string) => {
+  switch (s) {
+    case "minted": return "Terbit";
+    case "revoked": return "Dicabut";
+    case "certified": return "Sertifikat Sudah Diterbitkan";
+    case "approved": return "Lulus / Siap Diterbitkan";
+    default: return s;
+  }
+};
+
+function Field({ label, value, mono }: { label: string; value: string | null | undefined; mono?: boolean }) {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-        </div>
-      }
-    >
-      <VerifyPageInner />
-    </Suspense>
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</p>
+      <p className={`mt-2 break-all text-sm font-semibold text-slate-950 ${mono ? "font-mono" : ""}`}>
+        {value || "Belum tersedia"}
+      </p>
+    </div>
   );
 }
-function VerifyPageInner() {
-  const searchParams = useSearchParams();
+
+function OnChainBadge({ onChain }: { onChain: OnChainResult | null }) {
+  if (!onChain) return null;
+
+  if (!onChain.checked) {
+    return (
+      <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+        <WifiOff className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+        <div>
+          <p className="text-sm font-semibold text-slate-900">Verifikasi on-chain belum tersedia</p>
+          <p className="mt-1 text-sm leading-6 text-slate-600">{onChain.error || "Kontrak belum dikonfigurasi untuk pemeriksaan on-chain."}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (onChain.error && onChain.owner_match === null) {
+    return (
+      <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
+        <ShieldQuestion className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+        <div>
+          <p className="text-sm font-semibold text-amber-800">Verifikasi on-chain perlu dicek ulang</p>
+          <p className="mt-1 text-sm leading-6 text-amber-700">{onChain.error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (onChain.owner_match === true) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4">
+          <Wifi className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+          <div>
+            <p className="text-sm font-semibold text-emerald-800">Data on-chain sesuai</p>
+            <p className="mt-1 text-sm leading-6 text-emerald-700">Kepemilikan token cocok dengan wallet peserta yang tersimpan di sistem.</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          {onChain.token_uri && (
+            <a
+              href={onChain.token_uri.startsWith("ipfs://") ? `https://ipfs.io/ipfs/${onChain.token_uri.replace("ipfs://", "")}` : onChain.token_uri}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-blue-700 transition hover:bg-slate-50"
+            >
+              <ExternalLink className="h-4 w-4" /> Metadata IPFS
+            </a>
+          )}
+          {onChain.tx_hash && (
+            <a
+              href={`https://amoy.polygonscan.com/tx/${onChain.tx_hash}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-blue-700 transition hover:bg-slate-50"
+            >
+              <ExternalLink className="h-4 w-4" /> PolygonScan
+            </a>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-4">
+      <ShieldX className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+      <div>
+        <p className="text-sm font-semibold text-red-800">Data on-chain tidak cocok</p>
+        <p className="mt-1 text-sm leading-6 text-red-700">Owner on-chain: {onChain.on_chain_owner || "Belum tersedia"}. Data ini berbeda dengan wallet peserta di database.</p>
+      </div>
+    </div>
+  );
+}
+
+export default function VerifyPage() {
   const [query, setQuery] = useState("");
-  const [state, setState] = useState<VerifyState>("idle");
-  const [result, setResult] = useState<any>(null);
-  const [imageUrl, setImageUrl] = useState<string>("");
-  const [qrOpen, setQrOpen] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const detectorRef = useRef<any>(null);
-  const scanInterval = useRef<any>(null);
-  useEffect(() => {
-    const certParam = searchParams.get("cert");
-    if (certParam) {
-      setQuery(certParam);
-      doVerify(certParam);
-    }
-  }, []);
-  const stopCamera = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    if (scanInterval.current) {
-      clearInterval(scanInterval.current);
-      scanInterval.current = null;
-    }
-    setQrOpen(false);
-  }, []);
-  const startQrScan = useCallback(async () => {
-    try {
-      if (!("BarcodeDetector" in window)) {
-        toast.error(
-          "Browser Anda tidak mendukung scan QR. Gunakan Chrome/Edge terbaru.",
-        );
-        return;
-      }
-      setQrOpen(true);
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
-      detectorRef.current = new (window as any).BarcodeDetector({
-        formats: ["qr_code"],
-      });
-      scanInterval.current = setInterval(async () => {
-        if (!videoRef.current || !detectorRef.current) return;
-        try {
-          const barcodes = await detectorRef.current.detect(videoRef.current);
-          if (barcodes.length > 0) {
-            const raw = barcodes[0].rawValue;
-            const extracted = raw.includes("?cert=")
-              ? raw.split("?cert=")[1]
-              : raw;
-            stopCamera();
-            setQuery(extracted);
-            doVerify(extracted);
-            toast.success("QR berhasil discan!");
-          }
-        } catch {}
-      }, 500);
-    } catch (e: unknown) {
-      toast.error(
-        "Tidak dapat mengakses kamera. Pastikan izin kamera diberikan.",
-      );
-      setQrOpen(false);
-    }
-  }, [stopCamera]);
-  const doVerify = async (q: string) => {
-    const trimmed = q.trim();
-    if (!trimmed) return;
-    setState("loading");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState<VerifyResult | null>(null);
+
+  const runVerification = async (searchQuery: string) => {
+    if (!searchQuery.trim()) return;
+    setLoading(true);
+    setError("");
     setResult(null);
-    setImageUrl("");
-    
-    const totalStartTime = performance.now();
-    let bcTime = 0;
-    let ipfsTime = 0;
     try {
-      
-      let data: any = null;
-      let error: any = null;
-
-      
-      const directRes = await supabase
-        .from("certificates")
-        .select(
-          `*, competency_schemes(name, criteria),
-          assessments(id, recommendation, score,
-            profiles!participant_id(full_name, wallet_address))`,
-        )
-        .or(`certificate_number.eq.${trimmed},token_id.eq.${trimmed}`)
-        .maybeSingle();
-
-      if (directRes.data) {
-        data = directRes.data;
-        error = directRes.error;
-      } else if (trimmed.startsWith("0x")) {
-        
-        const walletRes = await supabase
-          .from("certificates")
-          .select(
-            `*, competency_schemes(name, criteria),
-            assessments(id, recommendation, score,
-              profiles!participant_id(full_name, wallet_address))`,
-          )
-          .ilike("participant_wallet", trimmed)
-          .limit(1)
-          .maybeSingle();
-        data = walletRes.data;
-        error = walletRes.error;
+      const response = await fetch("/api/public/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: searchQuery }),
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        setError(json.error || "Sertifikat tidak ditemukan.");
       } else {
-        error = directRes.error;
-      }
-      if (error || !data || !data.token_id) {
-        setState("not_found");
-        return;
-      }
-      try {
-        const { readContract } = await import("thirdweb");
-        const { certificateContract } = await import("@/lib/thirdweb");
-        if (!certificateContract) throw new Error("Contract not connected");
-        const bcStartTime = performance.now();
-        const owner = await readContract({
-          contract: certificateContract,
-          method: "function ownerOf(uint256 tokenId) view returns (address)",
-          params: [BigInt(data.token_id)],
-        });
-        const tokenURI = await readContract({
-          contract: certificateContract,
-          method: "function tokenURI(uint256 tokenId) view returns (string)",
-          params: [BigInt(data.token_id)],
-        });
-        bcTime = performance.now() - bcStartTime;
-        const ipfsStartTime = performance.now();
-        const uri = data.ipfs_image_uri || data.metadata_uri;
-        if (uri) {
-          const url = uri.replace("ipfs://", "https://ipfs.io/ipfs/");
-          await fetch(url, { method: "HEAD" }).catch(() => {});
-          setImageUrl(url);
-        }
-        ipfsTime = performance.now() - ipfsStartTime;
-        setResult(data);
-        setState(data.status === "active" ? "valid" : "revoked");
-        const totalTime = performance.now() - totalStartTime;
-        console.table({
-          "Waktu Baca L2 Blockchain": `${bcTime.toFixed(2)} ms`,
-          "Waktu IPFS & Render": `${ipfsTime.toFixed(2)} ms`,
-          "Total TTV (Waktu Verifikasi)": `${totalTime.toFixed(2)} ms`,
-        });
-        supabase
-          .from("verification_logs")
-          .insert({
-            certificate_id: data.id,
-            query: trimmed,
-            verifier_ip: "public",
-            blockchain_time_ms: bcTime,
-            ipfs_time_ms: ipfsTime,
-            total_time_ms: totalTime
-          })
-          .then();
-      } catch (bcError) {
-        console.error("Gagal Verifikasi On-Chain:", bcError);
-        if (data && data.status === "revoked") {
-          setResult(data);
-          setState("revoked");
-        } else {
-          setState("not_found");
-        }
-        return;
+        setResult(json.result);
       }
     } catch {
-      setState("not_found");
+      setError("Gagal menghubungi layanan verifikasi publik.");
+    } finally {
+      setLoading(false);
     }
   };
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    doVerify(query);
+
+  const handleVerify = async (event: React.FormEvent) => {
+    event.preventDefault();
+    await runVerification(query);
   };
-  const handlePrint = async () => {
-    if (!imageUrl) return window.print();
-    const { jsPDF } = await import("jspdf");
-    const response = await fetch(imageUrl);
-    const blob = await response.blob();
-    const base64 = await new Promise<string>((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.readAsDataURL(blob);
-    });
-    const imgType = blob.type.includes("png") ? "PNG" : "JPEG";
-    const img = await createImageBitmap(blob);
-    const mmW = img.width * 0.264583;
-    const mmH = img.height * 0.264583;
-    const pdf = new jsPDF({ orientation: mmW > mmH ? "landscape" : "portrait", unit: "mm", format: [mmW, mmH] });
-    pdf.addImage(base64, imgType, 0, 0, mmW, mmH);
-    pdf.save(`${result?.certificate_number || "sertifikat"}.pdf`);
-  };
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success("Disalin!");
-  };
-  const participant = result?.assessments?.profiles;
-  const scheme = result?.competency_schemes;
-  const criteriaList = Array.isArray(scheme?.criteria) ? scheme.criteria : [];
-  const expiry = result?.minted_at
-    ? addYears(new Date(result.minted_at), 3)
-    : null;
-  const isExpired = expiry ? expiry < new Date() : false;
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("q");
+    if (q) {
+      setQuery(q);
+      runVerification(q);
+    }
+  }, []);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 flex flex-col font-sans print:bg-white">
-      <header className="px-6 py-4 flex items-center justify-between border-b border-slate-200 bg-white/80 backdrop-blur-sm print:border-0">
-        <a
-          href="/"
-          className="flex items-center gap-2.5 font-bold text-xl tracking-tight text-slate-900"
-        >
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow">
-            <Award className="w-4 h-4 text-white" />
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+          <Link href="/" className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-sm">
+              <Award className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-950">{APP_NAME}</p>
+              <p className="text-xs text-slate-500">Verifikasi Sertifikat Publik</p>
+            </div>
+          </Link>
+
+          <div className="flex items-center gap-3">
+            <span className="hidden rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 sm:inline-flex sm:items-center sm:gap-1.5">
+              <Wifi className="h-3 w-3" /> Polygon Amoy
+            </span>
+            <Link href="/login" className="text-sm font-medium text-slate-600 transition hover:text-slate-950">Portal Login</Link>
           </div>
-          KOMPETEN.ID
-        </a>
-        <a
-          href="/login"
-          className="text-sm text-slate-500 hover:text-slate-900 transition-colors print:hidden"
-        >
-          Portal Login →
-        </a>
+        </div>
       </header>
-      <main className="flex-1 flex flex-col items-center pt-12 px-4 pb-16 print:pt-4">
-        <div className="w-full max-w-2xl">
-          <div className="text-center mb-10 print:hidden">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-100 text-blue-700 text-sm font-medium mb-4">
-              <Lock className="w-3.5 h-3.5" /> Verifikasi Blockchain
-            </div>
-            <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 mb-3">
-              Cek Keaslian Sertifikat
-            </h1>
-            <p className="text-lg text-slate-500 max-w-lg mx-auto">
-              Masukkan Nomor Sertifikat atau Token ID untuk memverifikasi
-              keaslian sertifikat kompetensi secara kriptografis di blockchain
-              Polygon.
-            </p>
-          </div>
-          <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100 p-3 mb-6 print:hidden">
-            <form onSubmit={handleSubmit} className="flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Nomor Sertifikat, Token ID, atau Wallet (0x...)..."
-                  className="h-14 pl-12 pr-4 text-base bg-slate-50 border-slate-200 focus:border-blue-400 rounded-xl"
-                />
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-14 px-4 rounded-xl border-slate-200 hover:bg-slate-50 gap-2"
-                onClick={startQrScan}
-                title="Scan QR Code"
-              >
-                <QrCode className="w-5 h-5 text-slate-500" />
-                <span className="hidden sm:inline text-sm">Scan QR</span>
-              </Button>
-              <Button
-                type="submit"
-                disabled={state === "loading" || !query.trim()}
-                className="h-14 px-8 rounded-xl bg-blue-600 hover:bg-blue-700 font-semibold text-base shadow-sm"
-              >
-                {state === "loading" ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />{" "}
-                    Memverifikasi...
-                  </>
-                ) : (
-                  "Verifikasi"
-                )}
-              </Button>
-            </form>
-          </div>
-          {qrOpen && (
-            <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl p-4 w-full max-w-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 font-semibold text-slate-800">
-                    <Camera className="w-4 h-4 text-blue-600" /> Arahkan ke QR
-                    Code
-                  </div>
-                  <button
-                    onClick={stopCamera}
-                    className="text-slate-400 hover:text-slate-700"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-                <div className="relative rounded-xl overflow-hidden bg-black aspect-square">
-                  <video
-                    ref={videoRef}
-                    className="w-full h-full object-cover"
-                    muted
-                    playsInline
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-48 h-48 border-2 border-white/70 rounded-lg relative">
-                      <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-blue-400 rounded-tl" />
-                      <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-blue-400 rounded-tr" />
-                      <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-blue-400 rounded-bl" />
-                      <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-blue-400 rounded-br" />
-                    </div>
-                  </div>
-                </div>
-                <p className="text-xs text-slate-400 text-center mt-3">
-                  Scan otomatis ketika QR terdeteksi
-                </p>
-              </div>
-            </div>
-          )}
-          {state === "not_found" && (
-            <div className="text-center py-12 animate-in fade-in duration-300">
-              <div className="w-16 h-16 rounded-full bg-yellow-50 border-2 border-yellow-200 flex items-center justify-center mx-auto mb-4">
-                <AlertTriangle className="w-8 h-8 text-yellow-500" />
-              </div>
-              <h2 className="text-xl font-bold text-slate-800 mb-2">
-                Sertifikat Tidak Ditemukan
-              </h2>
-              <p className="text-slate-500 text-sm max-w-sm mx-auto">
-                Pastikan Nomor Sertifikat atau Token ID yang dimasukkan benar
-                dan sesuai dengan yang tertera pada dokumen.
-              </p>
-              <Button
-                variant="outline"
-                className="mt-6"
-                onClick={() => {
-                  setState("idle");
-                  setQuery("");
-                }}
-              >
-                Coba Lagi
-              </Button>
-            </div>
-          )}
-          {state === "valid" && result && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-400">
-              <div className="mb-5 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                  <ShieldCheck className="w-6 h-6 text-emerald-600" />
+
+      <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+          <section className="space-y-6">
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+              <div className="max-w-3xl space-y-4">
+                <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-1.5 text-sm font-semibold text-blue-700">
+                  <ShieldCheck className="h-4 w-4" /> Verifikasi Publik Tanpa Login
                 </div>
                 <div>
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <h2 className="text-lg font-bold text-emerald-800">
-                      ✅ SERTIFIKAT VALID
-                    </h2>
-                    {!isExpired ? (
-                      <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">
-                        Aktif
-                      </Badge>
-                    ) : (
-                      <Badge className="bg-orange-100 text-orange-700 border-orange-200">
-                        Expired
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-sm text-emerald-600">
-                    Sertifikat ini terverifikasi di blockchain Polygon dan sah
-                    secara kriptografis.
+                  <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Cek keaslian sertifikat digital dengan cepat</h1>
+                  <p className="mt-3 text-base leading-8 text-slate-600">
+                    Masukkan nomor sertifikat, token ID, atau wallet address untuk memeriksa sertifikat pelatihan <span className="font-semibold text-slate-900">{TRAINING_NAME}</span> bidang <span className="font-semibold text-slate-900">{TRAINING_FIELD}</span>.
                   </p>
                 </div>
               </div>
-              <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100 overflow-hidden">
-                {imageUrl && (
-                  <div className="aspect-[16/6] overflow-hidden bg-slate-100">
-                    <img
-                      src={imageUrl}
-                      alt="Sertifikat"
-                      className="w-full h-full object-cover"
+
+              <form onSubmit={handleVerify} className="mt-8 space-y-4" aria-label="Form verifikasi sertifikat">
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      id="verify-query"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Contoh: CERT-20260703-000001, token ID, atau 0x..."
+                      className="h-12 rounded-xl border-slate-300 pl-11"
+                      aria-label="Nomor sertifikat, token ID, atau wallet address"
                     />
                   </div>
-                )}
-                <div className="p-6 space-y-5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <InfoRow
-                      icon={Hash}
-                      label="Nomor Sertifikat"
-                      value={result.certificate_number}
-                      copyable
-                      onCopy={handleCopy}
-                    />
-                    <InfoRow
-                      icon={User}
-                      label="Nama Pemegang"
-                      value={participant?.full_name || "—"}
-                    />
-                    <InfoRow
-                      icon={BookOpen}
-                      label="Skema Kompetensi"
-                      value={scheme?.name || "—"}
-                    />
-                    <InfoRow
-                      icon={Calendar}
-                      label="Tanggal Terbit"
-                      value={
-                        result.minted_at
-                          ? format(new Date(result.minted_at), "dd MMMM yyyy", {
-                              locale: idLocale,
-                            })
-                          : "—"
-                      }
-                    />
-                  </div>
-                  {expiry && (
-                    <div
-                      className={`flex items-center gap-3 p-3 rounded-xl border ${isExpired ? "bg-orange-50 border-orange-200" : "bg-blue-50 border-blue-200"}`}
-                    >
-                      <Calendar
-                        className={`w-4 h-4 flex-shrink-0 ${isExpired ? "text-orange-500" : "text-blue-500"}`}
-                      />
+                  <Button type="submit" disabled={loading || !query.trim()} className="h-12 rounded-xl bg-blue-600 px-6 text-sm font-semibold text-white hover:bg-blue-700">
+                    {loading ? "Memverifikasi..." : "Verifikasi"}
+                  </Button>
+                </div>
+                <p className="text-sm text-slate-500">Gunakan data sertifikat yang kamu punya agar hasil verifikasi lebih cepat dan akurat.</p>
+              </form>
+            </div>
+
+            {error && (
+              <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-5 py-4">
+                <ShieldX className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+                <div>
+                  <p className="text-sm font-semibold text-red-800">Sertifikat tidak ditemukan</p>
+                  <p className="mt-1 text-sm leading-6 text-red-700">{error}</p>
+                </div>
+              </div>
+            )}
+
+            {result && (
+              <div className="space-y-5">
+                <div className="rounded-3xl border border-emerald-200 bg-emerald-50/70 p-6">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-600 text-white">
+                        <ShieldCheck className="h-5 w-5" />
+                      </div>
                       <div>
-                        <p
-                          className={`text-xs font-semibold uppercase tracking-wider ${isExpired ? "text-orange-600" : "text-blue-600"}`}
-                        >
-                          Berlaku s/d
-                        </p>
-                        <p
-                          className={`font-semibold ${isExpired ? "text-orange-800" : "text-blue-800"}`}
-                        >
-                          {format(expiry, "dd MMMM yyyy", { locale: idLocale })}
-                          {isExpired && " (Masa berlaku habis)"}
-                        </p>
+                        <p className="text-sm font-semibold text-emerald-800">Sertifikat ditemukan</p>
+                        <p className="mt-1 text-sm leading-6 text-emerald-700">Data sertifikat ditemukan di sistem dan bisa dicocokkan kembali dengan bukti publik yang tersedia.</p>
                       </div>
                     </div>
-                  )}
-                  {criteriaList.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Unit Kompetensi
-                        ({criteriaList.length})
-                      </p>
-                      <div className="space-y-1">
-                        {criteriaList.map((c: any, i: number) => (
-                          <div
-                            key={i}
-                            className="flex items-center gap-2 text-sm text-slate-700 py-1 border-b border-slate-50 last:border-0"
-                          >
-                            <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 text-xs flex items-center justify-center font-bold flex-shrink-0">
-                              {i + 1}
-                            </span>
-                            {c.name}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 text-sm space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
-                      Info Blockchain
-                    </p>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-500">Jaringan</span>
-                      <span className="font-medium">Polygon Amoy</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-500">Standar Token</span>
-                      <span className="font-medium">ERC-721 Soulbound</span>
-                    </div>
-                    {result.token_id && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">Token ID</span>
-                        <span className="font-mono font-medium">
-                          {result.token_id}
-                        </span>
-                      </div>
-                    )}
-                    {result.tx_hash && (
-                      <div className="flex justify-between items-center text-sm pt-2 border-t border-slate-200">
-                        <span className="text-slate-500">Transaksi</span>
-                        <span className="font-mono text-xs text-slate-600 truncate max-w-[120px]">
-                          {result.tx_hash.slice(0, 10)}...
-                        </span>
-                      </div>
-                    )}
+                    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${result.status === "revoked" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>
+                      {statusLabel(result.status)}
+                    </span>
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-3 pt-2 print:hidden">
-                    {result.tx_hash && (
-                      <a
-                        href={`https://amoy.polygonscan.com/tx/${result.tx_hash}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex-1"
-                      >
-                        <Button
-                          variant="outline"
-                          className="w-full gap-2 border-slate-200"
-                        >
-                          <ExternalLink className="w-4 h-4" /> Lihat di
-                          Blockchain
-                        </Button>
-                      </a>
-                    )}
-                    <Button
-                      className="flex-1 gap-2 bg-blue-600 hover:bg-blue-700"
-                      onClick={handlePrint}
-                    >
-                      <Printer className="w-4 h-4" /> Cetak PDF
-                    </Button>
+                </div>
+
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="Nomor Sertifikat" value={result.certificate_number} />
+                    <Field label="Nama Peserta" value={result.participant_name} />
+                    <Field label="Pelatihan" value={result.training_name} />
+                    <Field label="Bidang" value={result.training_field} />
+                    <Field label="Wallet Address" value={result.participant_wallet} mono />
+                    <Field label="Token ID" value={result.token_id || "Belum tersedia"} mono />
+                    <Field label="Hash Transaksi" value={result.tx_hash || "Belum tersedia"} mono />
+                    <Field label="Tanggal Terbit" value={result.minted_at ? new Date(result.minted_at).toLocaleString("id-ID") : "Belum tersedia"} />
+                    {result.revoked_at && <Field label="Tanggal Dicabut" value={new Date(result.revoked_at).toLocaleString("id-ID")} />}
+                    {result.revocation_reason && <Field label="Alasan Pencabutan" value={result.revocation_reason} />}
+                    <div className="md:col-span-2">
+                      <Field label="Catatan Hasil" value={result.recommendation || "Belum ada catatan hasil penilaian"} />
+                    </div>
                   </div>
-                  {result.participant_wallet && (
+                </div>
+
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Pencocokan Data On-Chain</p>
+                  <div className="mt-4">
+                    <OnChainBadge onChain={result.on_chain} />
+                  </div>
+                  {result.tx_hash && (
                     <a
-                      href={`/p/${result.participant_wallet}`}
+                      href={`https://amoy.polygonscan.com/tx/${result.tx_hash}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="print:hidden"
+                      className="mt-4 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-blue-700 transition hover:bg-slate-50"
                     >
-                      <Button variant="outline" className="w-full gap-2 border-slate-200 text-slate-600">
-                        <User className="w-4 h-4" /> Lihat Semua Sertifikat Pemilik
-                      </Button>
+                      <ExternalLink className="h-4 w-4" /> Periksa transaksi di PolygonScan Amoy
                     </a>
                   )}
                 </div>
               </div>
+            )}
+          </section>
+
+          <aside className="space-y-4 lg:sticky lg:top-8">
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Panduan Singkat</p>
+              <div className="mt-4 space-y-3 text-sm leading-7 text-slate-600">
+                <p>1. Masukkan nomor sertifikat, token ID, atau wallet address.</p>
+                <p>2. Sistem akan mencari data sertifikat dari portal publik.</p>
+                <p>3. Jika tersedia, halaman juga menampilkan bukti kecocokan data on-chain.</p>
+              </div>
             </div>
-          )}
-          {state === "revoked" && result && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-400">
-              <div className="mb-5 p-4 rounded-2xl bg-red-50 border border-red-200 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                  <ShieldBan className="w-6 h-6 text-red-600" />
+
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+                  <FileCheck2 className="h-5 w-5" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-red-800 mb-0.5">
-                    ❌ SERTIFIKAT DICABUT
-                  </h2>
-                  <p className="text-sm text-red-600">
-                    Sertifikat ini telah dicabut oleh Admin dan tidak lagi
-                    berlaku.
-                  </p>
+                  <p className="text-sm font-semibold text-slate-950">Apa yang bisa dicek?</p>
+                  <p className="mt-2 text-sm leading-7 text-slate-600">Status sertifikat, identitas pelatihan, token ID, hash transaksi, metadata, dan kecocokan wallet on-chain.</p>
                 </div>
               </div>
-              <div className="bg-white rounded-2xl shadow-lg border border-slate-100 p-6 space-y-5">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <InfoRow
-                    icon={Hash}
-                    label="Nomor Sertifikat"
-                    value={result.certificate_number}
-                  />
-                  <InfoRow
-                    icon={User}
-                    label="Nama Pemegang"
-                    value={participant?.full_name || "—"}
-                  />
-                  <InfoRow
-                    icon={BookOpen}
-                    label="Skema Kompetensi"
-                    value={scheme?.name || "—"}
-                  />
-                  <InfoRow
-                    icon={Calendar}
-                    label="Tanggal Terbit"
-                    value={
-                      result.minted_at
-                        ? format(new Date(result.minted_at), "dd MMMM yyyy", {
-                            locale: idLocale,
-                          })
-                        : "—"
-                    }
-                  />
-                </div>
-                <div className="p-4 bg-red-50 border border-red-200 rounded-xl space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-red-500 flex items-center gap-1.5">
-                    <ShieldBan className="w-3.5 h-3.5" /> Detail Pencabutan
-                  </p>
-                  {result.revoked_at && (
-                    <div className="text-sm">
-                      <span className="text-red-600 font-medium">
-                        Dicabut pada:{" "}
-                      </span>
-                      <span className="text-red-800">
-                        {format(
-                          new Date(result.revoked_at),
-                          "dd MMMM yyyy, HH:mm",
-                          { locale: idLocale },
-                        )}
-                      </span>
-                    </div>
-                  )}
-                  {result.revocation_reason && (
-                    <div className="text-sm">
-                      <span className="text-red-600 font-medium">Alasan: </span>
-                      <span className="text-red-800">
-                        {result.revocation_reason}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                {result.tx_hash && (
-                  <a
-                    href={`https://amoy.polygonscan.com/tx/${result.tx_hash}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <Button
-                      variant="outline"
-                      className="w-full gap-2 border-red-200 text-red-600 hover:bg-red-50"
-                    >
-                      <ExternalLink className="w-4 h-4" /> Lihat Riwayat
-                      Blockchain
-                    </Button>
-                  </a>
-                )}
-              </div>
             </div>
-          )}
-          {state === "idle" && (
-            <div className="mt-12 grid grid-cols-3 gap-4 text-center print:hidden">
-              {[
-                {
-                  icon: Lock,
-                  title: "Blockchain-Verified",
-                  desc: "Setiap sertifikat ditulis permanen di Polygon",
-                },
-                {
-                  icon: ShieldCheck,
-                  title: "Anti-Pemalsuan",
-                  desc: "NFT soulbound tidak dapat dipalsukan",
-                },
-                {
-                  icon: Unlock,
-                  title: "Akses Publik",
-                  desc: "Siapapun dapat memverifikasi tanpa login",
-                },
-              ].map((f) => {
-                const Icon = f.icon;
-                return (
-                  <div
-                    key={f.title}
-                    className="p-4 bg-white rounded-xl border border-slate-100 shadow-sm"
-                  >
-                    <Icon className="w-6 h-6 text-blue-500 mx-auto mb-2" />
-                    <p className="text-xs font-semibold text-slate-700">
-                      {f.title}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1">{f.desc}</p>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          </aside>
         </div>
       </main>
-      <footer className="border-t border-slate-200 py-4 text-center text-xs text-slate-400 print:hidden">
-        © 2024 KOMPETEN.ID — Identitas Kompetensi Anda, Terjamin di Blockchain
-      </footer>
-    </div>
-  );
-}
-function InfoRow({
-  icon: Icon,
-  label,
-  value,
-  copyable,
-  onCopy,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string;
-  copyable?: boolean;
-  onCopy?: (v: string) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-        <Icon className="w-3 h-3" /> {label}
-      </p>
-      <div className="flex items-center gap-2">
-        <p className="font-semibold text-slate-800 text-sm">{value}</p>
-        {copyable && onCopy && (
-          <button
-            onClick={() => onCopy(value)}
-            className="text-slate-300 hover:text-slate-600 transition-colors"
-          >
-            <Copy className="w-3.5 h-3.5" />
-          </button>
-        )}
-      </div>
     </div>
   );
 }

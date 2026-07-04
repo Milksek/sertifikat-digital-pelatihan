@@ -1,4 +1,4 @@
-export const uploadFileToIPFS = async (file: File) => {
+﻿export const uploadFileToIPFS = async (file: File) => {
   try {
     const formData = new FormData();
     formData.append("file", file);
@@ -41,3 +41,4 @@ export const uploadJsonToIPFS = async (jsonData: Record<string, unknown>) => {
     throw error;
   }
 };
+

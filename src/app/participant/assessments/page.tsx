@@ -2,261 +2,41 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/components/providers/auth-provider";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
-import {
-  FileCheck,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  ClipboardList,
-  ArrowRight,
-  Eye,
-} from "lucide-react";
-import { format } from "date-fns";
-import { id as idLocale } from "date-fns/locale";
-import Link from "next/link";
-const globalAssessmentsCache: Record<string, any[]> = {};
-export default function ParticipantAssessments() {
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ClipboardList } from "lucide-react";
+import { getAssessmentStatusBadgeClass, getAssessmentStatusLabel } from "@/lib/status-labels";
+
+type Row = { id: string; status: string; recommendation: string | null; created_at: string; assessor?: { full_name: string | null } | null; };
+
+export default function ParticipantAssessmentsPage() {
   const { user } = useAuth();
-  const cacheKey = user?.id || "guest";
-  const [assessments, setAssessments] = useState<any[]>(
-    globalAssessmentsCache[cacheKey] || [],
-  );
-  const [loading, setLoading] = useState(!globalAssessmentsCache[cacheKey]);
+  const [items, setItems] = useState<Row[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    async function fetchAssessments() {
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-      const key = user.id;
-      if (!globalAssessmentsCache[key]) {
-        setLoading(true);
-      }
-      try {
-        const { data, error } = await supabase
-          .from("assessments")
-          .select(
-            `
-            id,
-            status,
-            score,
-            recommendation,
-            created_at,
-            evaluated_at,
-            approved_at,
-            competency_schemes(name, criteria),
-            assessor:profiles!assessor_id(full_name)
-          `,
-          )
-          .eq("participant_id", key)
-          .order("created_at", { ascending: false });
-        if (error) console.error("Participant assessment fetch error:", error);
-        if (data) {
-          setAssessments(data);
-          globalAssessmentsCache[key] = data;
-        }
-      } catch (e) {
-        console.error("Fetch Exception Assessments:", e);
-      } finally {
+    let mounted = true;
+
+    async function load() {
+      if (!user?.id) return;
+
+      setLoading(true);
+      const { data } = await supabase.from("penilaian").select(`id,status,recommendation,created_at,assessor:profil!assessor_id(full_name)`).eq("participant_id", user.id).order("created_at", { ascending: false });
+      if (mounted) {
+        setItems((data as Row[]) || []);
         setLoading(false);
       }
     }
-    fetchAssessments();
-  }, [user]);
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "certified":
-        return (
-          <Badge className="bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-100 gap-1.5 font-medium">
-            <FileCheck className="w-3 h-3" /> Tersertifikasi
-          </Badge>
-        );
-      case "approved":
-        return (
-          <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100 gap-1.5 font-medium">
-            <CheckCircle2 className="w-3 h-3" /> Lulus
-          </Badge>
-        );
-      case "rejected":
-        return (
-          <Badge className="bg-red-100 text-red-700 border-red-200 hover:bg-red-100 gap-1.5 font-medium">
-            <XCircle className="w-3 h-3" /> Tidak Lulus
-          </Badge>
-        );
-      case "evaluated":
-        return (
-          <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-100 gap-1.5 font-medium">
-            <Clock className="w-3 h-3" /> Menunggu Persetujuan
-          </Badge>
-        );
-      case "in_progress":
-        return (
-          <Badge className="bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100 gap-1.5 font-medium">
-            <Clock className="w-3 h-3" /> Sedang Dinilai
-          </Badge>
-        );
-      default:
-        return (
-          <Badge
-            variant="outline"
-            className="gap-1.5 font-medium text-slate-600"
-          >
-            <Clock className="w-3 h-3" /> Terdaftar
-          </Badge>
-        );
-    }
-  };
-  const getResultBadge = (status: string) => {
-    switch (status) {
-      case "certified":
-        return (
-          <Badge className="bg-purple-500 hover:bg-purple-600 text-white gap-1.5">
-            <FileCheck className="w-3 h-3" /> Kompeten
-          </Badge>
-        );
-      case "approved":
-        return (
-          <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white gap-1.5">
-            <CheckCircle2 className="w-3 h-3" /> Kompeten
-          </Badge>
-        );
-      case "rejected":
-        return (
-          <Badge variant="destructive" className="gap-1.5">
-            <XCircle className="w-3 h-3" /> Belum Kompeten
-          </Badge>
-        );
-      default:
-        return (
-          <Badge variant="secondary" className="text-slate-500 gap-1.5">
-            <Clock className="w-3 h-3" /> Menunggu Hasil
-          </Badge>
-        );
-    }
-  };
-  const getScoreTotal = (score: unknown) => {
-    if (!score || !Array.isArray(score)) return null;
-    const total = score.reduce(
-      (sum: number, s: any) => sum + (s.score || 0),
-      0,
-    );
-    const max = score.reduce(
-      (sum: number, s: any) => sum + (s.maxScore || 0),
-      0,
-    );
-    return max > 0 ? `${total} / ${max}` : null;
-  };
+
+    load();
+    return () => { mounted = false; };
+  }, [user?.id]);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-            Penilaian Saya
-          </h1>
-          <p className="text-slate-500 mt-1">
-            Lihat status dan hasil uji kompetensi Anda.
-          </p>
-        </div>
-        <Link href="/participant/schemes">
-          <Button className="bg-blue-600 hover:bg-blue-700 gap-2">
-            Daftar Baru <ArrowRight className="w-4 h-4" />
-          </Button>
-        </Link>
-      </div>
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <Table>
-          <TableHeader className="bg-slate-50">
-            <TableRow>
-              <TableHead className="font-semibold text-slate-700">
-                Skema
-              </TableHead>
-              <TableHead className="font-semibold text-slate-700">
-                Tanggal Daftar
-              </TableHead>
-              <TableHead className="font-semibold text-slate-700">
-                Status
-              </TableHead>
-              <TableHead className="font-semibold text-slate-700">
-                Hasil
-              </TableHead>
-              <TableHead className="text-right font-semibold text-slate-700">
-                Aksi
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              Array.from({ length: 3 }).map((_, idx) => (
-                <TableRow key={idx}>
-                  {Array.from({ length: 6 }).map((_, j) => (
-                    <TableCell key={j}>
-                      <Skeleton className="h-4 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : assessments.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="h-40 text-center">
-                  <div className="flex flex-col items-center gap-3">
-                    <ClipboardList className="w-10 h-10 text-slate-200" />
-                    <p className="text-slate-500 text-sm">
-                      Belum ada riwayat assessment.
-                    </p>
-                    <Link href="/participant/schemes">
-                      <Button
-                        size="sm"
-                        className="bg-blue-600 hover:bg-blue-700 mt-2"
-                      >
-                        Daftar Assessment
-                      </Button>
-                    </Link>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : (
-              assessments.map((a: any) => (
-                <TableRow key={a.id} className="hover:bg-slate-50/60">
-                  <TableCell className="font-medium text-slate-900">
-                    {a.competency_schemes?.name}
-                  </TableCell>
-                  <TableCell className="text-slate-600">
-                    {format(new Date(a.created_at), "dd MMM yyyy", {
-                      locale: idLocale,
-                    })}
-                  </TableCell>
-                  <TableCell>{getStatusBadge(a.status)}</TableCell>
-                  <TableCell>{getResultBadge(a.status)}</TableCell>
-                  <TableCell className="text-right">
-                    <Link href={`/participant/assessments/${a.id}`}>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-slate-200 hover:bg-slate-100 gap-1.5"
-                      >
-                        <Eye className="w-3.5 h-3.5" /> Lihat Detail
-                      </Button>
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"><div className="flex items-start gap-4"><div className="rounded-2xl border border-blue-200 bg-blue-50 p-3 text-blue-700"><ClipboardList className="h-5 w-5" /></div><div><h1 className="text-3xl font-semibold tracking-tight text-slate-950">Penilaian Saya</h1><p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">Pantau status penilaian yang sedang atau pernah kamu ikuti dari satu halaman yang rapi dan mudah dibaca.</p></div></div></section>
+      <Card className="border-slate-200 shadow-sm"><CardHeader><CardTitle className="text-xl text-slate-950">Riwayat Penilaian</CardTitle><p className="text-sm text-slate-500">Status di bawah memakai label yang sama dengan halaman admin dan asesor agar konsisten.</p></CardHeader><CardContent><div className="overflow-hidden rounded-2xl border border-slate-200"><Table><TableHeader className="bg-slate-50"><TableRow><TableHead>ID Penilaian</TableHead><TableHead>Asesor</TableHead><TableHead>Status</TableHead><TableHead>Catatan</TableHead><TableHead>Waktu</TableHead></TableRow></TableHeader><TableBody>{loading ? <TableRow><TableCell colSpan={5} className="py-10 text-center text-slate-500">Memuat penilaian...</TableCell></TableRow> : items.length === 0 ? <TableRow><TableCell colSpan={5} className="py-10 text-center text-slate-500">Belum ada data penilaian.</TableCell></TableRow> : items.map((item) => <TableRow key={item.id}><TableCell className="font-mono text-xs text-slate-600">{item.id.slice(0, 8)}...</TableCell><TableCell className="text-sm text-slate-700">{item.assessor?.full_name || "Belum ditugaskan"}</TableCell><TableCell><Badge variant="outline" className={getAssessmentStatusBadgeClass(item.status)}>{getAssessmentStatusLabel(item.status)}</Badge></TableCell><TableCell className="max-w-[320px] text-sm text-slate-600">{item.recommendation || "Belum ada catatan hasil"}</TableCell><TableCell className="whitespace-nowrap text-xs text-slate-500">{new Date(item.created_at).toLocaleString("id-ID")}</TableCell></TableRow>)}</TableBody></Table></div></CardContent></Card>
     </div>
   );
 }

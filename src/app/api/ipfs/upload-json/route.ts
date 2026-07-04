@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 
 const PINATA_API_KEY = process.env.PINATA_API_KEY || "";
 const PINATA_SECRET_KEY = process.env.PINATA_SECRET_KEY || "";
@@ -53,3 +53,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState, useEffect, useCallback, startTransition } from "react";
 import { supabase } from "@/lib/supabase";
 import {
   Table,
@@ -34,60 +34,77 @@ const ACTION_LABELS: Record<
   string,
   { label: string; icon: React.ElementType; color: string }
 > = {
-  mint_nft: {
-    label: "Mint NFT",
+  mint_certificate: {
+    label: "Mint Sertifikat",
     icon: Award,
     color: "bg-emerald-100 text-emerald-700 border-emerald-200",
   },
-  revoke_certificate: {
-    label: "Revoke",
+  pencabutan_sertifikat: {
+    label: "Pencabutan Sertifikat",
     icon: ShieldBan,
     color: "bg-red-100 text-red-700 border-red-200",
   },
-  assessment_approved: {
-    label: "Setujui Assessment",
-    icon: FileCheck,
+  assign_assessor: {
+    label: "Penugasan Asesor",
+    icon: ClipboardList,
     color: "bg-blue-100 text-blue-700 border-blue-200",
-  },
-  assessment_rejected: {
-    label: "Tolak Assessment",
-    icon: FileCheck,
-    color: "bg-orange-100 text-orange-700 border-orange-200",
   },
 };
 const globalLogsCache: Record<string, any[]> = {};
+
+function formatLogDetails(log: any) {
+  if (!log.details) return "-";
+  if (log.action === "mint_certificate") {
+    try {
+      const parsed = typeof log.details === "string" ? JSON.parse(log.details) : log.details;
+      return `Mint sertifikat ${parsed.certificate_number} untuk wallet ${parsed.participant_wallet.slice(0, 8)}... (Token ID: ${parsed.token_id})`;
+    } catch {
+      return log.details;
+    }
+  }
+  return log.details;
+}
+
 export default function AdminLogs() {
   const [actionFilter, setActionFilter] = useState("all");
   const [logs, setLogs] = useState<any[]>(globalLogsCache[actionFilter] || []);
   const [loading, setLoading] = useState(!globalLogsCache[actionFilter]);
   const [search, setSearch] = useState("");
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     if (!globalLogsCache[actionFilter]) setLoading(true);
     let query = supabase
-      .from("activity_logs")
-      .select(`*, profiles(full_name, email)`)
+      .from("log_aktivitas")
+      .select(`*, profil(full_name, email)`)
       .order("created_at", { ascending: false })
       .limit(200);
     if (actionFilter !== "all") {
-      query = query.eq("action", actionFilter);
+      query = query.eq("activity_type", actionFilter);
     }
-    const { data } = await query;
+    const { data, error } = await query;
+    if (error) {
+      console.error("Error fetching logs:", error);
+    }
     if (data) {
-      setLogs(data);
-      globalLogsCache[actionFilter] = data;
+      const mapped = data.map((x: any) => ({
+        ...x,
+        action: x.activity_type,
+        details: x.activity_detail,
+      }));
+      setLogs(mapped);
+      globalLogsCache[actionFilter] = mapped;
     }
     setLoading(false);
-  };
-  useEffect(() => {
-    fetchLogs();
   }, [actionFilter]);
+  useEffect(() => {
+    startTransition(() => { fetchLogs(); });
+  }, [actionFilter, fetchLogs]);
   const filtered = logs.filter((l) => {
     const q = search.toLowerCase();
     return (
-      l.action?.toLowerCase().includes(q) ||
-      l.details?.toLowerCase().includes(q) ||
-      (l.profiles as any)?.full_name?.toLowerCase().includes(q) ||
-      (l.profiles as any)?.email?.toLowerCase().includes(q)
+      (l.action && l.action.toLowerCase().includes(q)) ||
+      (l.details && l.details.toLowerCase().includes(q)) ||
+      ((l.profil as any)?.full_name && (l.profil as any).full_name.toLowerCase().includes(q)) ||
+      ((l.profil as any)?.email && (l.profil as any).email.toLowerCase().includes(q))
     );
   });
   const getActionBadge = (action: string) => {
@@ -142,14 +159,9 @@ export default function AdminLogs() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Semua Aksi</SelectItem>
-            <SelectItem value="mint_nft">Mint NFT</SelectItem>
-            <SelectItem value="revoke_certificate">Revoke</SelectItem>
-            <SelectItem value="assessment_approved">
-              Setujui Assessment
-            </SelectItem>
-            <SelectItem value="assessment_rejected">
-              Tolak Assessment
-            </SelectItem>
+            <SelectItem value="mint_certificate">Mint Sertifikat</SelectItem>
+            <SelectItem value="pencabutan_sertifikat">Pencabutan</SelectItem>
+            <SelectItem value="assign_assessor">Penugasan Asesor</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -208,15 +220,15 @@ export default function AdminLogs() {
                   </TableCell>
                   <TableCell>
                     <p className="font-medium text-slate-800 text-sm">
-                      {(log.profiles as any)?.full_name || "—"}
+                      {(log.profil as any)?.full_name || ","}
                     </p>
                     <p className="text-xs text-slate-400">
-                      {(log.profiles as any)?.email || log.user_id?.slice(0, 8)}
+                      {(log.profil as any)?.email || log.actor_id?.slice(0, 8)}
                     </p>
                   </TableCell>
                   <TableCell>{getActionBadge(log.action)}</TableCell>
                   <TableCell className="text-sm text-slate-600 max-w-xs">
-                    <span className="line-clamp-2">{log.details || "—"}</span>
+                    <span className="line-clamp-2">{formatLogDetails(log)}</span>
                   </TableCell>
                 </TableRow>
               ))
@@ -227,3 +239,5 @@ export default function AdminLogs() {
     </div>
   );
 }
+
+

@@ -1,384 +1,147 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, startTransition, Fragment } from "react";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/components/providers/auth-provider";
-import { useActiveAccount } from "thirdweb/react";
-import { certificateContract, client } from "@/lib/thirdweb";
-import { prepareContractCall, sendTransaction, waitForReceipt } from "thirdweb";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ShieldBan, ShieldCheck, Search, ExternalLink, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { format } from "date-fns";
-import { id as idLocale } from "date-fns/locale";
-import {
-  Search,
-  ShieldBan,
-  CheckCircle2,
-  XCircle,
-  Award,
-  Wallet,
-} from "lucide-react";
-let globalRevocationsCache: any[] | null = null;
-export default function AdminRevoke() {
-  const { user } = useAuth();
-  const account = useActiveAccount();
-  const [certificates, setCertificates] = useState<any[]>(
-    globalRevocationsCache || [],
-  );
-  const [loading, setLoading] = useState(!globalRevocationsCache);
+import { TRAINING_NAME } from "@/lib/app-config";
+
+type Row = { id: string; certificate_number: string; participant_wallet: string; training_name: string; status: string; minted_at: string | null; tx_hash: string | null; token_id: string | null; assessment?: { participant?: { full_name: string | null } | null } | null; };
+
+const statusClass = (s: string) => {
+  if (s === "minted" || s === "certified") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (s === "revoked") return "border-red-200 bg-red-50 text-red-700";
+  return "border-slate-200 bg-slate-50 text-slate-600";
+};
+
+export default function AdminRevocationsPage() {
+  const [items, setItems] = useState<Row[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [revokeOpen, setRevokeOpen] = useState(false);
-  const [selectedCert, setSelectedCert] = useState<any>(null);
+  const [revoking, setRevoking] = useState<string | null>(null);
   const [reason, setReason] = useState("");
-  const [confirmed, setConfirmed] = useState(false);
-  const [processing, setProcessing] = useState(false);
-  const fetchCerts = async () => {
-    if (!globalRevocationsCache) setLoading(true);
-    const { data } = await supabase
-      .from("certificates")
-      .select(
-        `*, competency_schemes(name), assessments(id, profiles!participant_id(full_name, nik, wallet_address))`,
-      )
-      .order("minted_at", { ascending: false });
-    if (data) {
-      setCertificates(data);
-      globalRevocationsCache = data;
-    }
+
+  const load = async () => {
+    setLoading(true);
+    const { data } = await supabase.from("sertifikat").select(`id,certificate_number,participant_wallet,training_name,status,minted_at,tx_hash,token_id,assessment:penilaian(participant:profil!participant_id(full_name))`).order("created_at", { ascending: false });
+    setItems((data as Row[]) || []);
     setLoading(false);
   };
-  useEffect(() => {
-    fetchCerts();
-  }, []);
-  const filtered = certificates.filter((c) => {
-    const q = search.toLowerCase();
-    const participant = (c.assessments as any)?.profiles;
-    return (
-      c.certificate_number?.toLowerCase().includes(q) ||
-      c.token_id?.toLowerCase().includes(q) ||
-      participant?.nik?.toLowerCase().includes(q) ||
-      participant?.full_name?.toLowerCase().includes(q)
-    );
-  });
-  const openRevoke = (cert: unknown) => {
-    setSelectedCert(cert);
+
+  useEffect(() => { startTransition(() => { load(); }); }, []);
+
+  const handleRevoke = async (id: string) => {
+    if (!reason.trim()) return toast.error("Masukkan alasan pencabutan.");
+    const { error } = await supabase.from("sertifikat").update({ status: "revoked", revoked_at: new Date().toISOString(), revocation_reason: reason }).eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success("Sertifikat berhasil dicabut.");
+    setRevoking(null);
     setReason("");
-    setConfirmed(false);
-    setRevokeOpen(true);
+    load();
   };
-  const handleRevokeConfirm = async () => {
-    if (!account) {
-      toast.error("Harap hubungkan wallet");
-      return;
-    }
-    if (!reason.trim()) {
-      toast.error("Alasan pembatalan wajib diisi");
-      return;
-    }
-    if (!confirmed) {
-      toast.error("Centang kotak konfirmasi terlebih dahulu");
-      return;
-    }
-    try {
-      setProcessing(true);
-      if (certificateContract && selectedCert.token_id) {
-        toast.info("Mengirim transaksi revoke ke blockchain...");
-        try {
-          const tx = prepareContractCall({
-            contract: certificateContract,
-            method: "function adminBurn(uint256 tokenId)",
-            params: [BigInt(selectedCert.token_id)],
-          });
-          const { transactionHash } = await sendTransaction({
-            transaction: tx,
-            account,
-          });
-          await waitForReceipt({
-            client,
-            chain: certificateContract.chain,
-            transactionHash,
-          });
-        } catch (err: any) {
-          console.error("Revoke on-chain failed:", err);
-          throw new Error(
-            "Transaksi blockchain gagal/dibatalkan. Update database dihentikan.",
-          );
-        }
-      }
-      await supabase
-        .from("certificates")
-        .update({
-          status: "revoked",
-          revoked_at: new Date().toISOString(),
-          revoked_by: user?.id,
-          revocation_reason: reason,
-        })
-        .eq("id", (selectedCert as any).id);
-      await supabase
-        .from("activity_logs")
-        .insert({
-          user_id: user?.id,
-          action: "revoke_certificate",
-          details: `Sertifikat ${(selectedCert as any).certificate_number} dicabut. Alasan: ${reason}`,
-        })
-        .maybeSingle();
-      toast.success("Sertifikat berhasil dicabut.");
-      setRevokeOpen(false);
-      setConfirmed(false);
-      fetchCerts();
-    } catch (e: any) {
-      toast.error(e.message || "Gagal mencabut sertifikat");
-    } finally {
-      setProcessing(false);
-    }
-  };
+
+  const filtered = items.filter((i) => !search || i.certificate_number.toLowerCase().includes(search.toLowerCase()) || (i.assessment as any)?.participant?.full_name?.toLowerCase().includes(search.toLowerCase()));
+  const active = items.filter((i) => i.status === "minted" || i.status === "certified").length;
+  const revoked = items.filter((i) => i.status === "revoked").length;
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-          Revoke Sertifikat
-        </h1>
-        <p className="text-slate-500 mt-1">
-          Cari dan cabut sertifikat yang tidak valid atau bermasalah.
-        </p>
+        <h1 className="text-3xl font-black tracking-tight text-slate-900">Pencabutan Sertifikat</h1>
+        <p className="mt-1 text-sm text-slate-500">Kelola status sertifikat digital pelatihan <span className="font-semibold">{TRAINING_NAME}</span>.</p>
       </div>
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <Input
-          placeholder="Cari nomor sertifikat, Token ID, NIK, atau nama peserta..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9 bg-white border-slate-200"
-        />
+
+      <div className="grid grid-cols-2 gap-4">
+        <Card className="border-emerald-100 bg-emerald-50/50 shadow-sm">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-100 p-3 text-emerald-700"><ShieldCheck className="h-5 w-5" /></div>
+            <div><p className="text-sm font-semibold text-emerald-700">Aktif</p><p className="text-3xl font-black text-slate-900">{loading ? "..." : active}</p></div>
+          </CardContent>
+        </Card>
+        <Card className="border-red-100 bg-red-50/50 shadow-sm">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="rounded-2xl border border-red-200 bg-red-100 p-3 text-red-700"><ShieldBan className="h-5 w-5" /></div>
+            <div><p className="text-sm font-semibold text-red-700">Dicabut</p><p className="text-3xl font-black text-slate-900">{loading ? "..." : revoked}</p></div>
+          </CardContent>
+        </Card>
       </div>
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <Table>
-          <TableHeader className="bg-slate-50">
-            <TableRow>
-              <TableHead className="font-semibold text-slate-700">
-                No. Sertifikat
-              </TableHead>
-              <TableHead className="font-semibold text-slate-700">
-                Peserta
-              </TableHead>
-              <TableHead className="font-semibold text-slate-700">
-                Skema
-              </TableHead>
-              <TableHead className="font-semibold text-slate-700">
-                Diterbitkan
-              </TableHead>
-              <TableHead className="font-semibold text-slate-700">
-                Status
-              </TableHead>
-              <TableHead className="text-right font-semibold text-slate-700">
-                Aksi
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <TableRow key={i}>
-                  {Array.from({ length: 6 }).map((_, j) => (
-                    <TableCell key={j}>
-                      <Skeleton className="h-4 w-full" />
-                    </TableCell>
-                  ))}
+
+      <Card className="border-slate-200 shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <CardTitle className="flex items-center gap-2 text-xl text-slate-900"><ShieldBan className="h-5 w-5 text-red-600" /> Daftar Sertifikat</CardTitle>
+          <div className="relative w-56">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari nomor/peserta..." className="pl-9 h-9 rounded-xl border-slate-200" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-hidden rounded-2xl border border-slate-200">
+            <Table>
+              <TableHeader className="bg-slate-50">
+                <TableRow>
+                  <TableHead>Nomor Sertifikat</TableHead>
+                  <TableHead>Peserta</TableHead>
+                  <TableHead>Token ID</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Aksi</TableHead>
                 </TableRow>
-              ))
-            ) : filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="h-40 text-center">
-                  <div className="flex flex-col items-center gap-2">
-                    <Award className="w-10 h-10 text-slate-200" />
-                    <p className="text-sm text-slate-500">
-                      {search
-                        ? "Tidak ada sertifikat yang cocok."
-                        : "Belum ada sertifikat."}
-                    </p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : (
-              filtered.map((c) => {
-                const participant = (c.assessments as any)?.profiles;
-                return (
-                  <TableRow key={c.id} className="hover:bg-slate-50/60">
-                    <TableCell className="font-mono text-sm text-slate-700">
-                      {c.certificate_number || "—"}
-                    </TableCell>
-                    <TableCell>
-                      <p className="font-semibold text-slate-800">
-                        {participant?.full_name || "—"}
-                      </p>
-                      <p className="text-xs text-slate-400 font-mono">
-                        NIK: {participant?.nik || "—"}
-                      </p>
-                    </TableCell>
-                    <TableCell className="text-sm text-slate-600">
-                      {(c.competency_schemes as any)?.name}
-                    </TableCell>
-                    <TableCell className="text-sm text-slate-500">
-                      {c.minted_at
-                        ? format(new Date(c.minted_at), "dd MMM yyyy", {
-                            locale: idLocale,
-                          })
-                        : "—"}
-                    </TableCell>
-                    <TableCell>
-                      {c.status === "active" ? (
-                        <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 gap-1">
-                          <CheckCircle2 className="w-3 h-3" /> Aktif
-                        </Badge>
-                      ) : (
-                        <Badge className="bg-red-100 text-red-700 border-red-200 gap-1">
-                          <XCircle className="w-3 h-3" /> Dicabut
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="h-7 text-xs gap-1"
-                        disabled={c.status !== "active"}
-                        onClick={() => openRevoke(c)}
-                      >
-                        <ShieldBan className="w-3 h-3" />
-                        {c.status === "active" ? "Revoke" : "Dicabut"}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      <Dialog open={revokeOpen} onOpenChange={setRevokeOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
-              <ShieldBan className="w-5 h-5" /> Cabut Sertifikat
-            </DialogTitle>
-          </DialogHeader>
-          {selectedCert && (
-            <div className="py-2 space-y-4">
-              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-                <p className="font-semibold mb-1">
-                  ⚠️ Tindakan ini tidak dapat dibatalkan.
-                </p>
-                <p>
-                  Sertifikat{" "}
-                  <span className="font-mono font-bold">
-                    {selectedCert.certificate_number}
-                  </span>{" "}
-                  milik{" "}
-                  <strong>
-                    {(selectedCert.assessments as any)?.profiles?.full_name}
-                  </strong>{" "}
-                  akan dicabut dari sistem.
-                </p>
-              </div>
-              <div className="space-y-2">
-                <div className="flex flex-col gap-2">
-                  <Label>
-                    Alasan Pembatalan <span className="text-red-500">*</span>
-                  </Label>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {[
-                      "Pelanggaran kode etik",
-                      "Masa berlaku habis",
-                      "Salah input data",
-                      "Ditarik oleh Admin",
-                      "Pindah ke sertifikat level atas",
-                    ].map((templateReason) => (
-                      <Badge
-                        key={templateReason}
-                        variant="secondary"
-                        className="cursor-pointer hover:bg-slate-200 text-xs font-normal"
-                        onClick={() => setReason(templateReason)}
-                      >
-                        {templateReason}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-                <Textarea
-                  value={reason}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                    setReason(e.target.value)
-                  }
-                  placeholder="Tuliskan alasan pencabutan sertifikat yang jelas dan detail..."
-                  rows={4}
-                  className="border-red-200 focus-visible:ring-red-400"
-                />
-              </div>
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={confirmed}
-                  onChange={(e) => setConfirmed(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 accent-red-600"
-                />
-                <span className="text-sm text-slate-700">
-                  Saya yakin ingin mencabut sertifikat ini dan memahami bahwa
-                  tindakan ini <strong>tidak dapat dibatalkan</strong>.
-                </span>
-              </label>
-              {!account && (
-                <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700">
-                  <Wallet className="w-4 h-4 flex-shrink-0" /> Wallet belum
-                  terhubung.
-                </div>
-              )}
-            </div>
-          )}
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setRevokeOpen(false)}
-              disabled={processing}
-            >
-              Batal
-            </Button>
-            <Button
-              variant="destructive"
-              className="gap-2"
-              onClick={handleRevokeConfirm}
-              disabled={processing || !confirmed || !reason.trim()}
-            >
-              {processing ? (
-                <>
-                  <Skeleton className="w-4 h-4 rounded-full" /> Mencabut...
-                </>
-              ) : (
-                <>
-                  <ShieldBan className="w-4 h-4" /> Revoke Sertifikat
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow><TableCell colSpan={5} className="py-10 text-center text-slate-500">Memuat data...</TableCell></TableRow>
+                ) : filtered.length === 0 ? (
+                  <TableRow><TableCell colSpan={5} className="py-10 text-center text-slate-500">Belum ada sertifikat.</TableCell></TableRow>
+                ) : filtered.map((item) => (
+                  <Fragment key={item.id}>
+                    <TableRow>
+                      <TableCell>
+                        <p className="font-semibold text-slate-900">{item.certificate_number}</p>
+                        {item.tx_hash && (
+                          <a href={`https://amoy.polygonscan.com/tx/${item.tx_hash}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[10px] text-blue-500 hover:underline">
+                            <ExternalLink className="h-2.5 w-2.5" /> PolygonScan
+                          </a>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <p className="text-sm font-semibold text-slate-900">{(item.assessment as any)?.participant?.full_name || "Nama peserta belum tersedia"}</p>
+                        <p className="font-mono text-[10px] text-slate-400">{item.participant_wallet.slice(0, 12)}...</p>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-slate-600">{item.token_id || "Nama peserta belum tersedia"}</TableCell>
+                      <TableCell><Badge variant="outline" className={statusClass(item.status)}>{item.status === "minted" ? "Aktif" : item.status === "revoked" ? "Dicabut" : item.status}</Badge></TableCell>
+                      <TableCell>
+                        {item.status !== "revoked" ? (
+                          <Button size="sm" variant="destructive" onClick={() => setRevoking(revoking === item.id ? null : item.id)} className="bg-red-600 hover:bg-red-700">
+                            <ShieldBan className="mr-1.5 h-3.5 w-3.5" /> Cabut
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-slate-400">Sudah dicabut</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                    {revoking === item.id && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="bg-red-50 p-4">
+                          <div className="flex items-center gap-2 text-red-700 mb-3"><AlertTriangle className="h-4 w-4" /><span className="text-sm font-semibold">Konfirmasi Pencabutan Sertifikat</span></div>
+                          <div className="flex gap-3">
+                            <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Alasan pencabutan (wajib diisi)..." className="flex-1 rounded-xl border-red-200 bg-white" />
+                            <Button size="sm" variant="destructive" onClick={() => handleRevoke(item.id)} className="bg-red-600 hover:bg-red-700">Konfirmasi Cabut</Button>
+                            <Button size="sm" variant="outline" onClick={() => setRevoking(null)}>Batal</Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
+

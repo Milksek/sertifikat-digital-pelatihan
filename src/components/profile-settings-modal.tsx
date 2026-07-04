@@ -4,6 +4,7 @@ import { User, Mail, Phone, Hash, X, Save } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/components/providers/auth-provider";
+import { useWallet } from "@/contexts/WalletContext";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,9 @@ export function ProfileSettingsModal({
   isClosable?: boolean;
 }) {
   const { user } = useAuth();
+  const { walletAddress } = useWallet();
   const [saving, setSaving] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(false);
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -25,51 +28,112 @@ export function ProfileSettingsModal({
     nik: "",
   });
   useEffect(() => {
-    if (user && isOpen) {
+    let active = true;
+
+    async function hydrateProfile() {
+      if (!isOpen) return;
+
+      const cachedRaw = typeof window !== "undefined"
+        ? localStorage.getItem("ssdp_profile")
+        : null;
+      const cachedProfile = cachedRaw ? JSON.parse(cachedRaw) : null;
+      const sourceProfile = user || cachedProfile;
+
+      if (sourceProfile) {
+        setForm({
+          fullName: sourceProfile.full_name || "",
+          email: sourceProfile.email || "",
+          phone: sourceProfile.phone || "",
+          nik: sourceProfile.nik || "",
+        });
+      }
+
+      setLoadingProfile(true);
+      const token = localStorage.getItem("ssdp_token");
+      let data: any = null;
+
+      if (token) {
+        const response = await fetch("/api/profile/me", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const result = await response.json().catch(() => null);
+        data = result?.profile || null;
+      }
+
+      if (!data && walletAddress) {
+        const walletResponse = await fetch(`/api/profile/by-wallet?wallet=${walletAddress}`);
+        const walletResult = await walletResponse.json().catch(() => null);
+        data = walletResult?.profile || null;
+      }
+
+      if (!active || !data) {
+        setLoadingProfile(false);
+        return;
+      }
+
       setForm({
-        fullName: user.full_name || "",
-        email: user.email || "",
-        phone: user.phone || "",
-        nik: user.nik || "",
+        fullName: data.full_name || "",
+        email: data.email || "",
+        phone: data.phone || "",
+        nik: data.nik || "",
       });
+
+      localStorage.setItem(
+        "ssdp_profile",
+        JSON.stringify({
+          ...cachedProfile,
+          ...data,
+        }),
+      );
+
+      setLoadingProfile(false);
     }
-  }, [user, isOpen]);
+
+    hydrateProfile();
+    return () => {
+      active = false;
+    };
+  }, [user, isOpen, walletAddress]);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+
+    const cachedRaw = typeof window !== "undefined"
+      ? localStorage.getItem("ssdp_profile")
+      : null;
+    const cachedProfile = cachedRaw ? JSON.parse(cachedRaw) : null;
+    const sourceProfile = user || cachedProfile;
+
+    if (!sourceProfile?.id) return;
     if (!form.fullName || !form.email || !form.phone) {
       toast.error("Lengkapi semua field wajib");
       return;
     }
-    if (user.role === "participant" && form.nik.length !== 16) {
+    if (sourceProfile.role === "participant" && form.nik.length !== 16) {
       toast.error("NIK harus 16 digit");
       return;
     }
     try {
       setSaving(true);
       const { error } = await supabase
-        .from("profiles")
+        .from("profil")
         .update({
           full_name: form.fullName,
           email: form.email,
           phone: form.phone,
           nik: form.nik,
         })
-        .eq("id", user.id);
+        .eq("id", sourceProfile.id);
       if (error) throw error;
-      const cached = localStorage.getItem("kompetenid_profile");
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        const newProfile = {
-          ...parsed,
-          full_name: form.fullName,
-          email: form.email,
-          phone: form.phone,
-          nik: form.nik,
-        };
-        localStorage.setItem("kompetenid_profile", JSON.stringify(newProfile));
-        window.dispatchEvent(new Event("kompetenid_auth_change"));
-      }
+      const newProfile = {
+        ...cachedProfile,
+        ...sourceProfile,
+        full_name: form.fullName,
+        email: form.email,
+        phone: form.phone,
+        nik: form.nik,
+      };
+      localStorage.setItem("ssdp_profile", JSON.stringify(newProfile));
+      window.dispatchEvent(new Event("ssdp_auth_change"));
       toast.success(
         isClosable
           ? "Profil berhasil diperbarui!"
@@ -214,22 +278,24 @@ export function ProfileSettingsModal({
             )}{" "}
             <Button
               type="submit"
-              disabled={saving}
+              disabled={saving || loadingProfile}
               className="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white"
             >
-              {" "}
               {saving ? (
                 "Menyimpan..."
+              ) : loadingProfile ? (
+                "Memuat profil..."
               ) : (
                 <>
-                  {" "}
-                  <Save className="w-4 h-4 mr-2" /> Simpan Perubahan{" "}
+                  <Save className="w-4 h-4 mr-2" /> Simpan Perubahan
                 </>
-              )}{" "}
-            </Button>{" "}
+              )}
+            </Button>
           </form>{" "}
         </div>{" "}
       </div>{" "}
     </div>
   );
 }
+
+

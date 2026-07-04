@@ -1,8 +1,7 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense , startTransition} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useWallet } from "@/contexts/WalletContext";
-import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,24 +61,31 @@ function RegisterPopup({
         nik: form.nik,
         role: form.roleType,
       };
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          full_name: newProfile.full_name,
-          email: newProfile.email,
-          phone: newProfile.phone,
-          nik: newProfile.nik,
-          role: newProfile.role,
-        })
-        .eq("id", userId);
-      if (error) throw error;
-      localStorage.setItem("kompetenid_profile", JSON.stringify(newProfile));
-      localStorage.setItem("kompetenid_role", newProfile.role);
+      const res = await fetch("/api/auth/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          walletAddress,
+          fullName: form.fullName,
+          email: form.email,
+          phone: form.phone,
+          nik: form.nik,
+          role: form.roleType,
+        }),
+      });
+      const result = await res.json().catch(() => ({ error: "Gagal menyimpan" }));
+      if (!res.ok) throw new Error(result.error || "Gagal menyimpan");
+      if (result.accessToken) {
+        localStorage.setItem("ssdp_token", result.accessToken);
+      }
+      const mergedProfile = { ...newProfile, ...(result.profile || {}) };
+      localStorage.setItem("ssdp_profile", JSON.stringify(mergedProfile));
+      localStorage.setItem("ssdp_role", result.role || newProfile.role);
       if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("kompetenid_auth_change"));
+        window.dispatchEvent(new Event("ssdp_auth_change"));
       }
       toast.success("Profil berhasil disimpan!");
-      onSuccess(form.roleType);
+      onSuccess(result.role || form.roleType);
     } catch (e: any) {
       toast.error(e.message || "Gagal menyimpan");
     } finally {
@@ -87,124 +93,110 @@ function RegisterPopup({
     }
   };
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-lg rounded-[28px] border border-slate-200 bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-200 sm:p-7">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
+          className="absolute right-4 top-4 rounded-full border border-slate-200 p-2 text-slate-400 transition hover:border-slate-300 hover:text-slate-700"
+          aria-label="Tutup dialog"
         >
-          <X className="w-5 h-5" />
+          <X className="h-4 w-4" />
         </button>
-        <div className="p-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
-              <User className="w-5 h-5 text-blue-600" />
+
+        <div className="space-y-6">
+          <div className="space-y-3 pr-10">
+            <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              Wallet baru terdeteksi
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-900">
-                Lengkapi Profil
-              </h2>
-              <p className="text-xs text-slate-400">
-                Wallet baru terdeteksi — daftar sekarang
+              <h2 className="text-2xl font-bold tracking-tight text-slate-900">Lengkapi profil</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-500">
+                Isi data peserta agar akun bisa langsung dipakai untuk penilaian dan penerbitan sertifikat.
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl mb-5">
-            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-            <span className="font-mono text-xs text-slate-600 truncate">
-              {walletAddress}
-            </span>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Wallet aktif</p>
+            <p className="mt-2 truncate font-mono text-xs text-slate-700">{walletAddress}</p>
           </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
-                <User className="w-3 h-3" /> Nama Lengkap *
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                <User className="h-3.5 w-3.5" /> Nama lengkap
               </Label>
               <Input
                 value={form.fullName}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, fullName: e.target.value }))
-                }
+                onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
                 placeholder="Sesuai KTP"
+                className="h-11 rounded-2xl border-slate-200 px-4"
                 required
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
-                  <Mail className="w-3 h-3" /> Email *
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  <Mail className="h-3.5 w-3.5" /> Email
                 </Label>
                 <Input
                   type="email"
                   value={form.email}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, email: e.target.value }))
-                  }
-                  placeholder="email@contoh.com"
+                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                  placeholder="nama@contoh.com"
+                  className="h-11 rounded-2xl border-slate-200 px-4"
                   required
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
-                  <Phone className="w-3 h-3" /> Telepon *
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  <Phone className="h-3.5 w-3.5" /> Telepon
                 </Label>
                 <div className="relative flex items-center">
-                  <span className="absolute left-3 text-slate-500 font-medium text-sm border-r border-slate-300 pr-2 pb-0.5">
-                    +62
-                  </span>
+                  <span className="absolute left-4 text-sm font-semibold text-slate-500">+62</span>
                   <Input
                     value={form.phone}
                     onChange={(e) => {
                       const onlyNumbers = e.target.value.replace(/\D/g, "");
                       if (onlyNumbers.startsWith("0")) {
-                        setForm((f) => ({
-                          ...f,
-                          phone: onlyNumbers.substring(1),
-                        }));
+                        setForm((f) => ({ ...f, phone: onlyNumbers.substring(1) }));
                       } else {
                         setForm((f) => ({ ...f, phone: onlyNumbers }));
                       }
                     }}
                     placeholder="8xxxxxxxxxx"
-                    className="pl-14"
+                    className="h-11 rounded-2xl border-slate-200 pl-14 pr-4"
                     required
                   />
                 </div>
               </div>
             </div>
+
             {walletAddress !== MASTER_WALLET && (
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold text-slate-600">
-                  Daftar sebagai
-                </Label>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Peran akun</Label>
                 <RadioGroup
                   value={form.roleType}
                   onValueChange={(v) => setForm((f) => ({ ...f, roleType: v }))}
-                  className="grid grid-cols-2 gap-2"
+                  className="mt-3"
                 >
-                  {[
-                    { value: "participant", label: "Peserta" },
-                  ].map((r) => (
-                    <div
-                      key={r.value}
-                      className={`flex items-center gap-2 p-3 border rounded-xl cursor-pointer transition-all ${form.roleType === r.value ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:bg-slate-50"}`}
-                    >
-                      <RadioGroupItem value={r.value} id={`r-${r.value}`} />
-                      <Label
-                        htmlFor={`r-${r.value}`}
-                        className="cursor-pointer text-sm font-medium"
-                      >
-                        {r.label}
-                      </Label>
-                    </div>
-                  ))}
+                  <div className="flex items-start gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-3">
+                    <RadioGroupItem value="participant" id="r-participant" className="mt-1" />
+                    <Label htmlFor="r-participant" className="cursor-pointer space-y-1">
+                      <span className="block text-sm font-semibold text-slate-900">Peserta</span>
+                      <span className="block text-xs leading-5 text-slate-500">Digunakan untuk pelatihan Junior Web Developer.</span>
+                    </Label>
+                  </div>
                 </RadioGroup>
               </div>
             )}
+
             {form.roleType === "participant" && (
-              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1">
-                <Label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
-                  <CreditCard className="w-3 h-3" /> NIK KTP *
+              <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
+                <Label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  <CreditCard className="h-3.5 w-3.5" /> NIK
                 </Label>
                 <Input
                   value={form.nik}
@@ -214,22 +206,24 @@ function RegisterPopup({
                   }}
                   placeholder="16 digit NIK"
                   maxLength={16}
+                  className="h-11 rounded-2xl border-slate-200 px-4"
                   required
                 />
               </div>
             )}
+
             <Button
               type="submit"
               disabled={saving}
-              className="w-full h-11 bg-blue-600 hover:bg-blue-700 font-semibold gap-2 mt-2"
+              className="h-11 w-full rounded-2xl bg-blue-600 font-semibold text-white transition hover:bg-blue-700"
             >
               {saving ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Menyimpan...
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Menyimpan...
                 </>
               ) : (
                 <>
-                  <CheckCircle2 className="w-4 h-4" /> Selesaikan Pendaftaran
+                  <CheckCircle2 className="mr-2 h-4 w-4" /> Simpan dan lanjutkan
                 </>
               )}
             </Button>
@@ -254,18 +248,52 @@ function LoginContent() {
   useEffect(() => {
     const register = searchParams.get("register");
     const userId = searchParams.get("userId");
-    if (register === "1" && userId && walletAddress) {
-      setPendingUserId(userId);
-      setShowRegister(true);
+    let isProfileComplete = false;
+
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("ssdp_profile");
+        if (cached) {
+          const profile = JSON.parse(cached);
+          const isAdminWallet = walletAddress?.toLowerCase() === MASTER_WALLET;
+          isProfileComplete = Boolean(
+            profile?.full_name &&
+            profile?.email &&
+            profile?.phone &&
+            (isAdminWallet || (profile?.nik && String(profile.nik).length === 16)),
+          );
+        }
+      } catch {}
     }
+
+    if (register === "1" && userId && walletAddress && !isProfileComplete) {
+      startTransition(() => {
+        setPendingUserId(userId);
+        setShowRegister(true);
+      });
+      return;
+    }
+
+    startTransition(() => { setShowRegister(false); });
   }, [searchParams, walletAddress]);
-  const redirectByRole = (role: string) => {
+  const redirectByRole = (role: string, userId?: string) => {
     const route =
       role === "admin"
         ? "/admin/dashboard"
         : role === "assessor"
           ? "/assessor/dashboard"
           : "/participant/dashboard";
+    if (typeof window !== "undefined") {
+      if (userId) {
+        sessionStorage.setItem("ssdp_onboarding_done", userId);
+      }
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete("register");
+      cleanUrl.searchParams.delete("userId");
+      window.history.replaceState({}, "", cleanUrl.pathname || "/login");
+      window.location.replace(route);
+      return;
+    }
     router.prefetch(route);
     router.push(route);
   };
@@ -275,118 +303,108 @@ function LoginContent() {
     router.prefetch("/assessor/dashboard");
   }, [router]);
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 relative overflow-hidden">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-blue-500 opacity-10 blur-3xl animate-blob" />
-        <div className="absolute top-40 -left-20 w-80 h-80 rounded-full bg-indigo-400 opacity-10 blur-3xl animate-blob animation-delay-2000" />
-        <div className="absolute -bottom-20 right-20 w-96 h-96 rounded-full bg-violet-500 opacity-10 blur-3xl animate-blob animation-delay-4000" />
-        <div
-          className="absolute inset-0 opacity-5"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)",
-            backgroundSize: "50px 50px",
-          }}
-        />
-      </div>
-      <div className="relative z-10 flex flex-col items-center gap-10 w-full max-w-sm px-4">
-        <div className="text-center">
-          <div className="flex items-center justify-center gap-3 mb-3">
-            <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center shadow-xl shadow-blue-600/30">
-              <Award className="w-6 h-6 text-white" />
-            </div>
-            <h1 className="text-3xl font-extrabold text-white tracking-tight">
-              KOMPETEN.ID
-            </h1>
+    <div className="relative min-h-screen overflow-hidden bg-slate-950 text-white">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(37,99,235,0.24),_transparent_34%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[linear-gradient(180deg,rgba(59,130,246,0.08),transparent)]" />
+
+      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-5xl flex-col items-center justify-center px-6 py-12">
+        <div className="w-full max-w-xl text-center">
+          <div className="mb-8 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 shadow-lg shadow-blue-950/30">
+            <Award className="h-7 w-7 text-white" />
           </div>
-          <p className="text-slate-400 text-sm">
-            Identitas Kompetensi Anda, Terjamin di Blockchain
-          </p>
-        </div>
-        <div className="w-full bg-white/5 border border-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl">
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-medium mb-4">
-              <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />{" "}
-              Web3 Authentication
-            </div>
-            <h2 className="text-xl font-bold text-white mb-1">
-              {isSigning
-                ? "Menandatangani..."
-                : isModalConnecting
-                  ? "Membuka Wallet..."
-                  : "Masuk ke Portal"}
-            </h2>
-            <p className="text-slate-400 text-sm">
-              {isSigning
-                ? "Harap tanda tangani pesan di wallet Anda"
-                : isModalConnecting
-                  ? "Pilih akun di popup MetaMask"
-                  : "Hubungkan wallet MetaMask untuk login atau daftar otomatis"}
+          <div className="space-y-3">
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-blue-200">Portal Masuk</p>
+            <h1 className="text-4xl font-black tracking-tight text-white sm:text-5xl">
+              Sistem Sertifikat Digital Pelatihan
+            </h1>
+            <p className="mx-auto max-w-lg text-sm leading-7 text-slate-300 sm:text-base">
+              Hubungkan wallet MetaMask untuk masuk ke portal pelatihan Junior Web Developer dan lanjut ke dashboard sesuai peran.
             </p>
           </div>
-          {isConnecting && (
-            <div className="flex flex-col items-center justify-center gap-2 mb-5 p-4 bg-blue-500/10 border border-blue-400/20 rounded-xl">
-              <div className="flex items-center gap-3">
-                <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
-                <span className="text-sm font-medium text-blue-300">
-                  {isSigning ? "Menunggu Tanda Tangan" : "Menunggu Wallet"}
-                </span>
+        </div>
+
+        <div className="mt-10 w-full max-w-md rounded-[28px] border border-white/10 bg-white/8 p-6 shadow-2xl shadow-slate-950/40 backdrop-blur-xl sm:p-7">
+          <div className="space-y-5">
+            <div className="space-y-2 text-center">
+              <div className="inline-flex items-center gap-2 rounded-full bg-blue-500/15 px-3 py-1 text-xs font-semibold text-blue-100">
+                <span className="h-2 w-2 rounded-full bg-blue-300 animate-pulse" />
+                Autentikasi Wallet
               </div>
-              <p className="text-xs text-blue-400/70 mt-1 text-center">
+              <h2 className="text-2xl font-bold tracking-tight text-white">
+                {isSigning ? "Konfirmasi tanda tangan" : isModalConnecting ? "Membuka wallet" : "Masuk ke portal"}
+              </h2>
+              <p className="text-sm leading-6 text-slate-300">
                 {isSigning
-                  ? "Cek popup MetaMask untuk sign message"
-                  : "Pilih wallet di modal Thirdweb"}
+                  ? "Periksa MetaMask lalu tanda tangani pesan untuk menyelesaikan login."
+                  : isModalConnecting
+                    ? "Pilih akun yang akan digunakan untuk masuk ke sistem."
+                    : "Satu tombol untuk login dan pendaftaran awal peserta secara otomatis."}
               </p>
             </div>
-          )}
-          <Button
-            onClick={connectWallet}
-            disabled={isConnecting}
-            className="w-full h-12 rounded-xl bg-blue-600 hover:bg-blue-700 font-semibold text-white gap-2 transition-all relative overflow-hidden group"
-          >
-            {isConnecting ? (
-              <div className="flex items-center justify-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                {isSigning ? "Sign Message..." : "Loading Modal..."}
+
+            {isConnecting && (
+              <div className="rounded-2xl border border-blue-400/20 bg-blue-500/10 px-4 py-3 text-left text-blue-100">
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {isSigning ? "Menunggu tanda tangan" : "Menunggu wallet"}
+                </div>
+                <p className="mt-2 text-xs leading-5 text-blue-100/80">
+                  {isSigning ? "Tanda tangani pesan di MetaMask untuk melanjutkan." : "Pilih wallet pada jendela koneksi yang muncul."}
+                </p>
               </div>
-            ) : (
-              "🔗 Hubungkan Wallet MetaMask"
             )}
-            {!isConnecting && (
-              <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-[100%] group-hover:animate-[shimmer_1.5s_infinite]" />
-            )}
-          </Button>
-          <div className="mt-6 space-y-2">
-            {[
-              "Login dan daftar dari satu tombol yang sama",
-              "Tanda tangan kriptografis — tanpa password",
-              "Redirect otomatis ke dashboard sesuai role",
-            ].map((feat, i) => (
-              <div
-                key={i}
-                className="flex items-start gap-2.5 text-xs text-slate-400"
-              >
-                <ChevronRight className="w-3.5 h-3.5 text-blue-400 flex-shrink-0 mt-0.5" />
-                {feat}
+
+            <Button
+              onClick={connectWallet}
+              disabled={isConnecting}
+              className="h-12 w-full rounded-2xl bg-blue-600 font-semibold text-white transition hover:bg-blue-700"
+            >
+              {isConnecting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {isSigning ? "Menunggu tanda tangan..." : "Membuka koneksi..."}
+                </>
+              ) : (
+                <>
+                  Hubungkan Wallet MetaMask
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </>
+              )}
+            </Button>
+
+            <div className="space-y-2 rounded-2xl border border-white/8 bg-slate-950/30 px-4 py-3 text-left text-sm text-slate-300">
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 text-blue-300" />
+                <span>Tanpa kata sandi, cukup verifikasi wallet.</span>
               </div>
-            ))}
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 text-blue-300" />
+                <span>Peserta baru akan diarahkan ke form profil secara otomatis.</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 text-blue-300" />
+                <span>Setelah masuk, sistem akan mengarahkan Anda ke dashboard sesuai peran.</span>
+              </div>
+            </div>
           </div>
         </div>
+
         <a
           href="/verify"
-          className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 text-sm transition-colors"
+          className="mt-6 inline-flex items-center gap-2 text-sm text-slate-400 transition hover:text-white"
         >
-          Verifikasi sertifikat publik <ArrowRight className="w-3.5 h-3.5" />
+          Verifikasi sertifikat publik <ArrowRight className="h-4 w-4" />
         </a>
       </div>
+
       {showRegister && walletAddress && (
         <RegisterPopup
           walletAddress={walletAddress}
           userId={pendingUserId}
           onSuccess={(role) => {
             setShowRegister(false);
-            toast.success("Selamat datang di KOMPETEN.ID!");
-            redirectByRole(role);
+            toast.success("Selamat datang di Sistem Sertifikat Digital Pelatihan!");
+            redirectByRole(role, pendingUserId);
           }}
           onClose={() => setShowRegister(false)}
         />
@@ -407,3 +425,6 @@ export default function LoginPage() {
     </Suspense>
   );
 }
+
+
+

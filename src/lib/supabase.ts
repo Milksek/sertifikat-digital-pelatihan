@@ -5,13 +5,19 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
   global: {
     fetch: (input, init) => {
       if (typeof window !== "undefined") {
-        const token = localStorage.getItem("kompetenid_token");
+        const token = localStorage.getItem("ssdp_token");
         if (token) {
           try {
-            const payload = JSON.parse(atob(token.split(".")[1]));
+            const base64Url = token.split(".")[1];
+            let base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+            const pad = base64.length % 4;
+            if (pad) {
+              base64 += "=".repeat(4 - pad);
+            }
+            const payload = JSON.parse(atob(base64));
             const isExpired = payload.exp * 1000 < Date.now();
             if (isExpired) {
-              localStorage.removeItem("kompetenid_token");
+              localStorage.removeItem("ssdp_token");
             } else {
               init = init || {};
               const headers = new Headers(init.headers);
@@ -19,7 +25,7 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
               init.headers = headers;
             }
           } catch {
-            localStorage.removeItem("kompetenid_token");
+            localStorage.removeItem("ssdp_token");
           }
         }
       }
@@ -44,3 +50,5 @@ export const getAuthenticatedClient = (accessToken: string) => {
     },
   });
 };
+
+

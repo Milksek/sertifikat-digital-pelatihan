@@ -8,7 +8,7 @@ export default function NotFound() {
       {}
       <div className="flex items-center gap-2 font-bold text-xl tracking-tight text-slate-900 mb-12">
         <Shield className="w-6 h-6 text-blue-600" />
-        KOMPETEN.ID
+        Sistem Sertifikat Digital Pelatihan
       </div>
 
       {}
@@ -45,8 +45,12 @@ export default function NotFound() {
       </div>
 
       <p className="text-xs text-slate-400 mt-12">
-        © {new Date().getFullYear()} KOMPETEN.ID — Identitas Kompetensi Anda, Terjamin di Blockchain
+        © {new Date().getFullYear()} Sistem Sertifikat Digital Pelatihan. Penerbitan dan verifikasi sertifikat digital pelatihan berbasis blockchain.
       </p>
     </div>
   );
 }
+
+
+
+

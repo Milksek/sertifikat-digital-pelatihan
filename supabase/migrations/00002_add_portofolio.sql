@@ -1,5 +1,5 @@
--- Menambahkan kolom portfolio_files ke tabel assessments
-ALTER TABLE assessments ADD COLUMN IF NOT EXISTS portfolio_files JSONB DEFAULT '[]'::jsonb;
+﻿-- Menambahkan kolom portfolio_files ke tabel penilaian
+ALTER TABLE penilaian ADD COLUMN IF NOT EXISTS portfolio_files JSONB DEFAULT '[]'::jsonb;
 
 -- Membuat Bucket untuk penyimpanan portfolios jika belum ada
 INSERT INTO storage.buckets (id, name, public) VALUES ('portfolios', 'portfolios', true)
@@ -25,3 +25,4 @@ WITH CHECK ( bucket_id = 'portfolios' AND auth.uid() = owner );
 CREATE POLICY "Assessor Delete" 
 ON storage.objects FOR DELETE 
 USING ( bucket_id = 'portfolios' AND auth.uid() = owner );
+

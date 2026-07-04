@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState, useMemo } from "react";
-import { supabase } from "@/lib/supabase";
 import {
   Table,
   TableBody,
@@ -32,42 +31,27 @@ export default function AdminParticipants() {
   useEffect(() => {
     async function fetchParticipants() {
       try {
-        const { data: rawProfiles, error } = await supabase
-          .from("profiles")
-          .select(
-            "id, full_name, nik, phone, email, wallet_address, created_at",
-          )
-          .eq("role", "participant")
-          .order("created_at", { ascending: false });
-        if (error) throw error;
-        const baseProfiles = rawProfiles || [];
-        const { data: assessData } = await supabase
-          .from("assessments")
-          .select("participant_id");
-        const { data: certData } = await supabase
-          .from("certificates")
-          .select("participant_wallet");
-        const assessCounts = (assessData || []).reduce((acc: any, curr) => {
-          acc[curr.participant_id] = (acc[curr.participant_id] || 0) + 1;
-          return acc;
-        }, {});
-        const certCounts = (certData || []).reduce((acc: any, curr) => {
-          if (curr.participant_wallet) {
-            const w = curr.participant_wallet.toLowerCase();
-            acc[w] = (acc[w] || 0) + 1;
-          }
-          return acc;
-        }, {});
-        const merged = baseProfiles.map((p) => ({
-          ...p,
-          assessmentsCount: assessCounts[p.id] || 0,
-          certificatesCount: p.wallet_address
-            ? certCounts[p.wallet_address.toLowerCase()] || 0
-            : 0,
-        }));
-        setParticipants(merged);
+        const res = await fetch("/api/admin/participants", {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+        });
+
+        const payload = await res.json();
+        if (!res.ok || !payload.success) {
+          throw new Error(payload.error || `Gagal memuat peserta (HTTP ${res.status})`);
+        }
+
+        setParticipants(payload.participants || []);
       } catch (e: any) {
-        console.error("Failed to map participants:", e);
+        console.error("Failed to fetch participants:", {
+          message: e?.message || "Unknown error",
+          details: e?.details || null,
+          hint: e?.hint || null,
+          code: e?.code || null,
+          raw: e,
+        });
+        setParticipants([]);
       } finally {
         setLoading(false);
       }
@@ -179,7 +163,7 @@ export default function AdminParticipants() {
                           className="w-fit border-blue-200 bg-blue-50 text-blue-700 font-normal"
                         >
                           <Layers className="w-3 h-3 mr-1" />
-                          {p.assessmentsCount || 0} Uji Kompetensi
+                          {p.assessmentsCount || 0} Penilaian
                         </Badge>
                         <Badge
                           variant="outline"
@@ -210,3 +194,4 @@ export default function AdminParticipants() {
     </div>
   );
 }
+

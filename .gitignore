@@ -38,3 +38,6 @@ next-env.d.ts
 # Custom local scripts & notes
 Z-Note/
 remove-comments.js
+
+# smart contract build artifacts
+/artifacts/

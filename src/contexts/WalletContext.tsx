@@ -3,11 +3,13 @@ import { createContext, useContext, ReactNode, useState } from "react";
 import {
   useActiveAccount,
   useActiveWallet,
+  useActiveWalletChain,
   useConnectModal,
   useDisconnect,
+  useSwitchActiveWalletChain,
 } from "thirdweb/react";
 import { createWallet } from "thirdweb/wallets";
-import { client } from "@/lib/thirdweb";
+import { appChain, client, hasThirdwebClient } from "@/lib/thirdweb";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -19,17 +21,26 @@ interface WalletContextType {
   connectWallet: () => Promise<void>;
   disconnectWallet: () => void;
 }
+const MASTER_WALLET = "0x1cb90a414ade635dcfa78e41a825c789edde4d8e";
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
 export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const activeAccount = useActiveAccount();
   const activeWallet = useActiveWallet();
+  const activeChain = useActiveWalletChain();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSigning, setIsSigning] = useState(false);
   const { connect: openConnectModal } = useConnectModal();
   const { disconnect } = useDisconnect();
+  const switchActiveWalletChain = useSwitchActiveWalletChain();
   const router = useRouter();
   const walletAddress = activeAccount?.address?.toLowerCase() ?? null;
   const connectWallet = async () => {
+    if (!hasThirdwebClient || !client) {
+      toast.error("Konfigurasi wallet belum lengkap.", {
+        description: "Isi NEXT_PUBLIC_THIRDWEB_CLIENT_ID agar fitur login wallet bisa dipakai.",
+      });
+      return;
+    }
     if (isConnecting || isSigning) return;
     setIsConnecting(true);
     let connectedWallet;
@@ -52,17 +63,20 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       const account = connectedWallet.getAccount();
       const address = account?.address?.toLowerCase();
       if (!account || !address) throw new Error("Gagal mengambil data akun");
+
+      const connectedChain = activeChain ?? connectedWallet.getChain();
+      if (!connectedChain || connectedChain.id !== appChain.id) {
+        toast.info("Pindah ke Polygon Amoy dulu", {
+          description: "Login portal ini hanya menerima wallet pada network Polygon Amoy.",
+        });
+        await switchActiveWalletChain(appChain);
+      }
+
       const domain = window.location.host;
-      const message = `Selamat datang di Portal KOMPETEN.ID!
-───────────────
-Verifikasi Kepemilikan Wallet
-───────────────
-Tanda tangan pesan ini untuk login ke sistem.
-Tindakan ini aman, tidak memerlukan biaya gas (Bebas Biaya),
-dan tidak akan mengubah atau memindahkan aset digital Anda.
-Alamat URI  : ${domain}
-Wallet Anda : ${address}
-Timestamp   : ${Date.now()}`;
+      const message = `Login ke Sistem Sertifikat Digital Pelatihan
+Domain: ${domain}
+Wallet: ${address}
+Waktu: ${Date.now()}`;
       await account.signMessage({ message });
       const res = await fetch("/api/auth/sync", {
         method: "POST",
@@ -76,25 +90,29 @@ Timestamp   : ${Date.now()}`;
       const { role, isNewUser, userId, accessToken, profile } =
         await res.json();
       if (accessToken) {
-        localStorage.setItem("kompetenid_token", accessToken);
+        localStorage.setItem("ssdp_token", accessToken);
       }
       if (profile) {
-        localStorage.setItem("kompetenid_profile", JSON.stringify(profile));
+        localStorage.setItem("ssdp_profile", JSON.stringify(profile));
         if (profile.role) {
-          localStorage.setItem("kompetenid_role", profile.role);
+          localStorage.setItem("ssdp_role", profile.role);
         }
       }
       if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("kompetenid_auth_change"));
+        window.dispatchEvent(new Event("ssdp_auth_change"));
       }
       toast.success("Login berhasil!", {
         description: `${address.slice(0, 6)}...${address.slice(-4)}`,
       });
-      if (isNewUser) {
+      const isAdminWallet = address === MASTER_WALLET || role === "admin";
+      if (isNewUser && !isAdminWallet) {
         router.push(`/login?register=1&userId=${userId}`);
         return;
       }
-      if (role === "admin") router.push("/admin/dashboard");
+      if (isAdminWallet) {
+        window.location.replace("/admin/dashboard");
+        return;
+      }
       else if (role === "assessor") router.push("/assessor/dashboard");
       else router.push("/participant/dashboard");
     } catch (error: any) {
@@ -117,7 +135,7 @@ Timestamp   : ${Date.now()}`;
   };
   const disconnectWallet = () => {
     if (activeWallet) disconnect(activeWallet);
-    localStorage.removeItem("kompetenid_token");
+    localStorage.removeItem("ssdp_token");
     toast.info("Wallet terputus");
   };
   return (
