@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireAdminUser, getAdminClient } from "@/lib/server-auth";
 
 export async function GET(req: NextRequest) {
