@@ -24,6 +24,21 @@ type Row = {
 type AssessorOption = { id: string; full_name: string | null; email?: string | null; };
 const ALL_STATUSES = ["pending", "in_progress", "evaluated", "approved", "certified", "rejected"];
 
+function formatIndonesiaDate(dateString: string) {
+  try {
+    const d = new Date(dateString);
+    const day = String(d.getDate()).padStart(2, "0");
+    const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+    const month = months[d.getMonth()];
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, "0");
+    const minutes = String(d.getMinutes()).padStart(2, "0");
+    return `${day} ${month} ${year}, ${hours}:${minutes} WIB`;
+  } catch {
+    return dateString;
+  }
+}
+
 export default function AdminAssessmentsPage() {
   const [items, setItems] = useState<Row[]>([]);
   const [assessors, setAssessors] = useState<AssessorOption[]>([]);
@@ -100,7 +115,7 @@ export default function AdminAssessmentsPage() {
               <Table>
                 <TableHeader className="bg-slate-50"><TableRow><TableHead>Peserta</TableHead><TableHead>Asesor</TableHead><TableHead>Status</TableHead><TableHead>Catatan</TableHead><TableHead>Tanggal</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {loading ? <TableRow><TableCell colSpan={6} className="py-10 text-center text-slate-500">Memuat data penilaian...</TableCell></TableRow> : filtered.length === 0 ? <TableRow><TableCell colSpan={6} className="py-10 text-center text-slate-500">Tidak ada penilaian yang cocok dengan filter saat ini.</TableCell></TableRow> : filtered.map((item) => <TableRow key={item.id}><TableCell><p className="font-semibold text-slate-900">{item.participant?.full_name || "Nama peserta belum tersedia"}</p><p className="font-mono text-[11px] text-slate-400">{item.participant?.wallet_address ? `${item.participant.wallet_address.slice(0, 10)}...` : ""}</p></TableCell><TableCell className="text-sm text-slate-700">{item.status === "pending" ? <div className="min-w-[220px]"><Select value={selectedAssessors[item.id] || ""} onValueChange={(value) => setSelectedAssessors((prev) => ({ ...prev, [item.id]: value }))}><SelectTrigger className="w-full border-slate-200 bg-white"><SelectValue placeholder="Pilih asesor" /></SelectTrigger><SelectContent>{assessors.map((assessor) => <SelectItem key={assessor.id} value={assessor.id}>{assessor.full_name || assessor.email || assessor.id}</SelectItem>)}</SelectContent></Select></div> : item.assessor?.full_name || <span className="italic text-slate-400">Belum ditugaskan</span>}</TableCell><TableCell><Badge variant="outline" className={getAssessmentStatusBadgeClass(item.status)}>{getAssessmentStatusLabel(item.status)}</Badge></TableCell><TableCell className="max-w-[260px] text-sm text-slate-600">{item.recommendation || "Belum ada catatan asesor"}</TableCell><TableCell className="whitespace-nowrap text-xs text-slate-500">{new Date(item.created_at).toLocaleString("id-ID")}</TableCell><TableCell>{item.status === "pending" ? <Button size="sm" className="rounded-xl bg-blue-600 text-white hover:bg-blue-700" disabled={assigningId === item.id} onClick={() => assignAssessor(item.id)}><UserPlus className="mr-1.5 h-3.5 w-3.5" /> Assign Asesor</Button> : <span className="text-xs text-slate-400">Sudah diproses</span>}</TableCell></TableRow>)}
+                  {loading ? <TableRow><TableCell colSpan={6} className="py-10 text-center text-slate-500">Memuat data penilaian...</TableCell></TableRow> : filtered.length === 0 ? <TableRow><TableCell colSpan={6} className="py-10 text-center text-slate-500">Tidak ada penilaian yang cocok dengan filter saat ini.</TableCell></TableRow> : filtered.map((item) => <TableRow key={item.id}><TableCell><p className="font-semibold text-slate-900">{item.participant?.full_name || "Nama peserta belum tersedia"}</p><p className="font-mono text-[11px] text-slate-400">{item.participant?.wallet_address ? `${item.participant.wallet_address.slice(0, 10)}...` : ""}</p></TableCell><TableCell className="text-sm text-slate-700">{item.status === "pending" ? <div className="min-w-[220px]"><Select value={selectedAssessors[item.id] || ""} onValueChange={(value) => setSelectedAssessors((prev) => ({ ...prev, [item.id]: value }))}><SelectTrigger className="w-full border-slate-200 bg-white"><SelectValue placeholder="Pilih asesor" /></SelectTrigger><SelectContent>{assessors.map((assessor) => <SelectItem key={assessor.id} value={assessor.id}>{assessor.full_name || assessor.email || assessor.id}</SelectItem>)}</SelectContent></Select></div> : item.assessor?.full_name || <span className="italic text-slate-400">Belum ditugaskan</span>}</TableCell><TableCell><Badge variant="outline" className={getAssessmentStatusBadgeClass(item.status)}>{getAssessmentStatusLabel(item.status)}</Badge></TableCell><TableCell className="max-w-[260px] text-sm text-slate-600">{item.recommendation || "Belum ada catatan asesor"}</TableCell><TableCell className="whitespace-nowrap text-xs text-slate-500">{formatIndonesiaDate(item.created_at)}</TableCell><TableCell>{item.status === "pending" ? <Button size="sm" className="rounded-xl bg-blue-600 text-white hover:bg-blue-700" disabled={assigningId === item.id} onClick={() => assignAssessor(item.id)}><UserPlus className="mr-1.5 h-3.5 w-3.5" /> Assign Asesor</Button> : <span className="text-xs text-slate-400">Sudah diproses</span>}</TableCell></TableRow>)}
                 </TableBody>
               </Table>
             </div>
