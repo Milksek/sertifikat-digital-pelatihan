@@ -2,6 +2,7 @@
 import { useState, useEffect, Suspense , startTransition} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useWallet } from "@/contexts/WalletContext";
+import { useActiveAccount } from "thirdweb/react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +41,7 @@ function RegisterPopup({
     roleType: walletAddress === MASTER_WALLET ? "admin" : "participant",
   });
   const [saving, setSaving] = useState(false);
+  const account = useActiveAccount();
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.fullName || !form.email || !form.phone) {
@@ -61,11 +63,19 @@ function RegisterPopup({
         nik: form.nik,
         role: form.roleType,
       };
+      const nonceRes = await fetch(`/api/auth/nonce?wallet=${walletAddress.toLowerCase()}`);
+      if (!nonceRes.ok) throw new Error("Gagal mengambil nonce login");
+      const nonceData = await nonceRes.json();
+
+      const signature = await account.signMessage({ message: nonceData.message });
+
       const res = await fetch("/api/auth/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           walletAddress,
+          message: nonceData.message,
+          signature,
           fullName: form.fullName,
           email: form.email,
           phone: form.phone,

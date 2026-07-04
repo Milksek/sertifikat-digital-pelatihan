@@ -72,16 +72,19 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         await switchActiveWalletChain(appChain);
       }
 
-      const domain = window.location.host;
-      const message = `Login ke Sistem Sertifikat Digital Pelatihan
-Domain: ${domain}
-Wallet: ${address}
-Waktu: ${Date.now()}`;
-      await account.signMessage({ message });
+      // 1. Fetch nonce from server
+      const nonceRes = await fetch(`/api/auth/nonce?wallet=${address}`);
+      if (!nonceRes.ok) throw new Error("Gagal mengambil nonce login");
+      const { message } = await nonceRes.json();
+
+      // 2. Sign the server-returned message via wallet
+      const signature = await account.signMessage({ message });
+
+      // 3. Send walletAddress, message, and signature to backend
       const res = await fetch("/api/auth/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ walletAddress: address }),
+        body: JSON.stringify({ walletAddress: address, message, signature }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Server error" }));
