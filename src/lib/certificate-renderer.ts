@@ -55,7 +55,7 @@ function splitName(value: string, maxLength = 28) {
 }
 
 export async function renderCertificatePng(input: RenderCertificateInput) {
-  const templatePath = "C:\\Users\\Rad\\Downloads\\Github\\cert-system\\Tempelate Sertifikat.png";
+  const templatePath = path.join(process.cwd(), "Tempelate Sertifikat.png");
   const template = sharp(templatePath);
   const metadata = await template.metadata();
 
@@ -65,13 +65,13 @@ export async function renderCertificatePng(input: RenderCertificateInput) {
   const safeParticipantLines = participantLines.map(escapeSvgText);
 
   const overlay = `
-    <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http:
+    <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
       <style>
         .title { fill: #ffffff; font-size: ${Math.round(width * 0.03)}px; font-weight: 700; font-family: 'Poppins', sans-serif; }
         .name { fill: #ffffff; font-size: ${Math.round(width * 0.048)}px; font-weight: 700; font-family: 'Poppins', sans-serif; }
         .label { fill: #ffffff; font-size: ${Math.round(width * 0.015)}px; font-weight: 600; font-family: 'Poppins', sans-serif; letter-spacing: 1.2px; }
         .value { fill: #ffffff; font-size: ${Math.round(width * 0.018)}px; font-weight: 700; font-family: 'Poppins', sans-serif; }
-        .field { fill: #ffffff; font-size: ${Math.round(width * 0.018)}px; font-weight: 700; font-family: 'Poppins', sans-serif; }
+        .field { fill: #ffffff; font-size: ${Math.round(width * 0.015)}px; font-weight: 400; font-family: 'Poppins', sans-serif; }
       </style>
  
       <!-- Nama Peserta (Sejajar di tengah area abu-abu kanan pada 68%) -->
@@ -79,8 +79,8 @@ export async function renderCertificatePng(input: RenderCertificateInput) {
       ${safeParticipantLines[1] ? `<text x="68%" y="58.8%" text-anchor="middle" class="name">${safeParticipantLines[1]}</text>` : ""}
  
       <!-- Nama Pelatihan & Bidang (Di atas dan di bawah garis putih kedua) -->
-      <text x="55%" y="73%" text-anchor="middle" class="value">${escapeSvgText(input.trainingName)}</text>
-      <text x="70%" y="68%" text-anchor="middle" class="field">${escapeSvgText(input.trainingField)}</text>
+      <text x="54%" y="73%" text-anchor="middle" class="value">${escapeSvgText(input.trainingName)}</text>
+      <text x="68%" y="68%" text-anchor="middle" class="field">${escapeSvgText(input.trainingField)}</text>
 
       <!-- Nomor Sertifikat (Pojok Kiri Atas) -->
       <text x="5%" y="5%" class="label">NOMOR SERTIFIKAT</text>
