@@ -61,7 +61,6 @@ function RegisterPopup({
         email: form.email,
         phone: form.phone,
         nik: form.nik,
-        role: form.roleType,
       };
       const nonceRes = await fetch(`/api/auth/nonce?wallet=${walletAddress.toLowerCase()}`);
       if (!nonceRes.ok) throw new Error("Gagal mengambil nonce login");
@@ -94,7 +93,7 @@ function RegisterPopup({
         window.dispatchEvent(new Event("ssdp_auth_change"));
       }
       toast.success("Profil berhasil disimpan!");
-      onSuccess(result.role || form.roleType);
+      onSuccess(result.role || "participant");
     } catch (e: any) {
       toast.error(e.message || "Gagal menyimpan");
     } finally {
