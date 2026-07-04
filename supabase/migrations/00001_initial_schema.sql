@@ -290,6 +290,9 @@ BEGIN
 END;
 $$;
 
+REVOKE ALL ON FUNCTION public.verify_certificate_public(TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.verify_certificate_public(TEXT, TEXT) TO service_role;
+
 -- ============================================================
 -- ROW LEVEL SECURITY
 -- ============================================================

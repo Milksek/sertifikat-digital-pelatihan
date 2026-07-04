@@ -47,7 +47,8 @@ export async function requireAuthenticatedUser(req: NextRequest): Promise<Authen
     .eq("id", userData.user.id)
     .maybeSingle();
 
-  if (profileError || !profile) throw new Error("Profil pengguna tidak ditemukan.");
+  if (profileError) throw new Error("Gagal memuat profil pengguna.");
+  if (!profile) throw new Error("Profil pengguna tidak ditemukan.");
 
   return profile as AuthenticatedProfile;
 }

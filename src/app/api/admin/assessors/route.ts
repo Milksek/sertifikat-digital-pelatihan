@@ -1,13 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminUser, getAdminClient } from "@/lib/server-auth";
-import { createClient } from "@supabase/supabase-js";
-
-function getAuthClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) throw new Error("Supabase auth environment belum lengkap.");
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
-}
 
 export async function GET(req: NextRequest) {
   try {
@@ -39,7 +31,6 @@ export async function POST(req: NextRequest) {
   try {
     const adminProfile = await requireAdminUser(req);
     const supabaseAdmin = getAdminClient();
-    const supabaseAuth = getAuthClient();
 
     const body = await req.json();
     const { walletAddress, fullName, email, phone } = body;
@@ -83,7 +74,7 @@ export async function POST(req: NextRequest) {
       if (updateErr) throw new Error(`Gagal update role asesor: ${updateErr.message}`);
     } else {
       // Create new auth user
-      const { data: newUser, error: createErr } = await supabaseAuth.auth.admin.createUser({
+      const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
         email: syntheticEmail,
         password: syntheticPassword,
         email_confirm: true,

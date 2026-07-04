@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { verifyMessage } from "viem";
 
 const MASTER_WALLET = (
   process.env.MASTER_WALLET_ADDRESS ??
@@ -30,10 +31,6 @@ function getAuthClient() {
   return _supabaseAuth;
 }
 
-function normalizeRole(addr: string, role?: string | null) {
-  return addr === MASTER_WALLET ? "admin" : role ?? "participant";
-}
-
 async function writeProfileOrThrow(
   operation: Promise<{ error: { message?: string } | null }>,
   context: string,
@@ -47,12 +44,29 @@ async function writeProfileOrThrow(
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { walletAddress, fullName, email: bodyEmail, phone, nik, role: bodyRole } = body;
-    if (!walletAddress)
+    const { walletAddress, message, signature, fullName, email: bodyEmail, phone, nik } = body;
+
+    if (!walletAddress || !message || !signature) {
       return NextResponse.json(
-        { error: "walletAddress required" },
+        { error: "walletAddress, message, dan signature wajib diisi." },
         { status: 400 },
       );
+    }
+
+    // Verify wallet signature — prevents impersonation
+    const valid = await verifyMessage({
+      address: walletAddress as `0x${string}`,
+      message,
+      signature: signature as `0x${string}`,
+    });
+
+    if (!valid) {
+      return NextResponse.json(
+        { error: "Signature wallet tidak valid." },
+        { status: 401 },
+      );
+    }
+
     const addr = walletAddress.toLowerCase();
     const syntheticEmail = `${addr.slice(2)}@wallet.local`;
     const syntheticPassword = `${addr}-ssdp-wallet-login`;
@@ -63,7 +77,7 @@ export async function POST(req: NextRequest) {
       .select("*")
       .eq("wallet_address", addr)
       .maybeSingle()) as { data: any | null };
-    if (existing) existing = { ...existing, role: normalizeRole(addr, existing.role) };
+
     let userId: string;
     let role: string;
     let signInResult = await supabaseAuth.auth.signInWithPassword({
@@ -175,5 +189,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
-
-

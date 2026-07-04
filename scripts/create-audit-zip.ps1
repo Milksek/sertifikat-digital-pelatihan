@@ -67,7 +67,6 @@ Copy-Safe "src\app\api\profile\by-wallet\route.ts"
 # Libraries
 Copy-Safe "src\lib\thirdweb.ts"
 Copy-Safe "src\lib\supabase.ts"
-Copy-Safe "src\lib\pinata.ts"
 Copy-Safe "src\lib\certificate-renderer.ts"
 Copy-Safe "src\lib\app-config.ts"
 Copy-Safe "src\lib\status-labels.ts"
@@ -79,6 +78,7 @@ Copy-Safe "src\app\admin\mint\[id]\page.tsx"
 Copy-Safe "src\app\admin\logs\page.tsx"
 Copy-Safe "src\app\admin\assessments\page.tsx"
 Copy-Safe "src\app\admin\assessors\page.tsx"
+Copy-Safe "src\app\admin\participants\page.tsx"
 Copy-Safe "src\app\verify\page.tsx"
 Copy-Safe "src\app\participant\assessments\page.tsx"
 Copy-Safe "src\app\participant\assessments\[id]\page.tsx"
@@ -87,6 +87,9 @@ Copy-Safe "src\app\assessor\evaluate\[id]\page.tsx"
 # Database migrations
 Copy-Safe "supabase\migrations"
 
+# Public assets
+Copy-Safe "public\certificate_template.png"
+
 # Testing & Deploy setup
 $testRoot = Join-Path $root "cert-system-testing"
 if (Test-Path $testRoot) {
@@ -94,7 +97,6 @@ if (Test-Path $testRoot) {
     Copy-Safe "cert-system-testing\1-unit-testing-hardhat"
     Copy-Safe "cert-system-testing\scripts\deploy.js"
 } else {
-    # Testing files might be in root or Testing subdir  
     Copy-Safe "hardhat.config.js"
     Copy-Safe "hardhat.config.ts"
     Copy-Safe "1-unit-testing-hardhat"
