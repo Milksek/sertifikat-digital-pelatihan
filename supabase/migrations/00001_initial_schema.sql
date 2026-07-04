@@ -169,7 +169,7 @@ CREATE INDEX IF NOT EXISTS idx_penilaian_assessor_id
 CREATE INDEX IF NOT EXISTS idx_penilaian_status
     ON public.penilaian(status);
 
--- Auto-create profil on auth signup
+-- handle_new_user: force role = 'participant' always, ignore metadata role
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -177,11 +177,11 @@ BEGIN
     VALUES (
         NEW.id,
         NEW.raw_user_meta_data->>'wallet_address',
-        COALESCE(NEW.raw_user_meta_data->>'role', 'participant')
+        'participant'
     );
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
@@ -301,7 +301,7 @@ ALTER TABLE public.log_verifikasi ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.log_aktivitas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.log_transaksi ENABLE ROW LEVEL SECURITY;
 
--- profil: user sendiri bisa read/write, admin bisa baca semua
+-- profil: user sendiri bisa read, admin bisa baca semua. Writes via server-only API.
 CREATE POLICY "profil_select_own_or_admin" ON public.profil
     FOR SELECT USING (
         auth.uid() = id
@@ -310,10 +310,8 @@ CREATE POLICY "profil_select_own_or_admin" ON public.profil
             WHERE id = auth.uid() AND role = 'admin'
         )
     );
-CREATE POLICY "profil_insert_own" ON public.profil
-    FOR INSERT WITH CHECK (auth.uid() = id);
-CREATE POLICY "profil_update_own" ON public.profil
-    FOR UPDATE USING (auth.uid() = id);
+-- profil_insert_own and profil_update_own intentionally dropped
+-- All profile writes go through server-side API using service role
 
 -- penilaian: participant own row, assessor assigned row, admin semua
 CREATE POLICY "penilaian_select_role_based" ON public.penilaian
