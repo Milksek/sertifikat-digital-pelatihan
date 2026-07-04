@@ -24,7 +24,7 @@ contract SertifikatDigital is ERC721Base {
         _safeMint(recipient, 1, "");
     }
 
-    // ─── Fungsi utama penerbitan sertifikat (1 peserta = 1 SBT) ──────────────
+    // ─── Fungsi utama penerbitan satu sertifikat untuk satu proses minting ─────
     function mintCertificate(address recipient, string calldata uri) external {
         require(msg.sender == owner(), "Not authorized");
         _mintTo(recipient, uri);
@@ -45,8 +45,8 @@ contract SertifikatDigital is ERC721Base {
         _burn(tokenId, false);
     }
 
-    // ─── Soulbound guard permanen: blokir transfer antar wallet ──────────────
-    // Tidak dapat dinonaktifkan karena soulbound adalah konstanta immutable.
+    // ─── Soulbound guard permanen: blokir transfer antar wallet ───────────────
+    // Tidak dapat dinonaktifkan karena soulbound adalah konstanta.
     function _beforeTokenTransfers(address from, address to, uint256 startTokenId, uint256 quantity)
         internal
         override
