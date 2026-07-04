@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useActiveAccount } from "thirdweb/react";
 import { toast } from "sonner";
@@ -27,6 +26,7 @@ export default function RegisterPage() {
     institution: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const account = useActiveAccount();
   useEffect(() => {
     if (!isLoading) {
       if (!user) {
@@ -56,28 +56,39 @@ export default function RegisterPage() {
     }
     try {
       setIsSubmitting(true);
-      const { error } = await supabase
-        .from("profil")
-        .update({
-          full_name: formData.fullName,
+      // Fatal 3: Use server-side API instead of direct Supabase update (RLS blocks direct update)
+      if (!account) throw new Error("Wallet tidak terkoneksi");
+
+      const nonceRes = await fetch(`/api/auth/nonce?wallet=${account.address?.toLowerCase()}`);
+      if (!nonceRes.ok) throw new Error("Gagal mengambil nonce login");
+      const { message } = await nonceRes.json();
+
+      const signature = await account.signMessage({ message });
+
+      const res = await fetch("/api/auth/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          walletAddress: account.address,
+          message,
+          signature,
+          fullName: formData.fullName,
           email: formData.email,
           phone: formData.phone,
           nik: formData.nik,
-          role: "participant",
-        })
-        .eq("id", user.id);
-      if (error) throw error;
+        }),
+      });
+      const result = await res.json().catch(() => ({ error: "Server error" }));
+      if (!res.ok) throw new Error(result.error || "Gagal menyimpan data profil");
+
+      if (result.accessToken) {
+        localStorage.setItem("ssdp_token", result.accessToken);
+      }
+      if (result.profile) {
+        localStorage.setItem("ssdp_profile", JSON.stringify(result.profile));
+      }
+      localStorage.setItem("ssdp_role", result.role || "participant");
       toast.success("Registrasi berhasil!");
-      const updatedProfile = {
-        ...user,
-        full_name: formData.fullName,
-        email: formData.email,
-        phone: formData.phone,
-        nik: formData.nik,
-        role: "participant",
-      };
-      localStorage.setItem("ssdp_profile", JSON.stringify(updatedProfile));
-      localStorage.setItem("ssdp_role", "participant");
       window.location.href = "/participant/dashboard";
     } catch (error: unknown) {
       console.error(error);
