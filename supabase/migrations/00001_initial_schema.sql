@@ -21,6 +21,7 @@ CREATE TABLE public.profil (
     email TEXT,
     phone TEXT,
     nonce TEXT,
+    nonce_timestamp TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

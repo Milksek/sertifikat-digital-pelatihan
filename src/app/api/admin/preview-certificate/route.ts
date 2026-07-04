@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { renderCertificatePng } from "@/lib/certificate-renderer";
+import { buildCertificateNumber } from "@/lib/certificate-number";
 import { TRAINING_NAME, TRAINING_FIELD } from "@/lib/app-config";
 
 export const runtime = "nodejs";
@@ -26,11 +27,6 @@ function getAuthedClient(token: string) {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { autoRefreshToken: false, persistSession: false },
   });
-}
-
-function buildCertificateNumber(assessmentId: string) {
-  const cleanId = assessmentId.replace(/-/g, "").slice(0, 12).toUpperCase();
-  return `CERT-JWD-${cleanId}`;
 }
 
 export async function GET(req: NextRequest) {

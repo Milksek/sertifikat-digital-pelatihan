@@ -72,6 +72,11 @@ Copy-Safe "src\lib\app-config.ts"
 Copy-Safe "src\lib\status-labels.ts"
 Copy-Safe "src\lib\server-auth.ts"
 
+# Auth & Login pages
+Copy-Safe "src\app\login\page.tsx"
+Copy-Safe "src\app\register\page.tsx"
+Copy-Safe "src\lib\certificate-number.ts"
+
 # Views/Pages
 Copy-Safe "src\app\admin\mint\page.tsx"
 Copy-Safe "src\app\admin\mint\[id]\page.tsx"

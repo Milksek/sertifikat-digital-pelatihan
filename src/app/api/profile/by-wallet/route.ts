@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     const admin = getAdmin();
     const { data: profile, error } = await admin
       .from("profil")
-      .select("id, wallet_address, full_name")
+      .select("wallet_address, full_name")
       .eq("wallet_address", wallet)
       .maybeSingle();
 

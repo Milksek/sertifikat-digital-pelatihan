@@ -47,7 +47,6 @@ export async function POST(req: NextRequest) {
 
     const addr = walletAddress.toLowerCase();
     const syntheticEmail = `${addr.slice(2)}@wallet.local`;
-    const syntheticPassword = `${addr}-ssdp-wallet-login`;
 
     // Find existing profile by wallet
     const { data: existing } = await supabaseAdmin
@@ -73,10 +72,11 @@ export async function POST(req: NextRequest) {
 
       if (updateErr) throw new Error(`Gagal update role asesor: ${updateErr.message}`);
     } else {
-      // Create new auth user
+      // Create new auth user with random password
+      const sessionPassword = `ssdp-${crypto.randomUUID()}`;
       const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
         email: syntheticEmail,
-        password: syntheticPassword,
+        password: sessionPassword,
         email_confirm: true,
         user_metadata: { wallet_address: addr },
       });

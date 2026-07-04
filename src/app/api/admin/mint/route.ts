@@ -18,6 +18,7 @@ import {
   TRAINING_FIELD,
   TRAINING_NAME,
 } from "@/lib/app-config";
+import { buildCertificateNumber } from "@/lib/certificate-number";
 import { renderCertificatePng } from "@/lib/certificate-renderer";
 import { requireAdminUser, getAdminClient } from "@/lib/server-auth";
 
@@ -67,11 +68,6 @@ function normalizePrivateKey(value: string) {
 function toIpfsGateway(uri: string | null) {
   if (!uri) return null;
   return uri.startsWith("ipfs://") ? `https://ipfs.io/ipfs/${uri.slice(7)}` : uri;
-}
-
-function buildCertificateNumber(assessmentId: string) {
-  const suffix = assessmentId.replace(/-/g, "").slice(0, 8).toUpperCase();
-  return `SDP-JWD-${suffix}`;
 }
 
 async function uploadJsonToPinata(fileName: string, payload: object) {

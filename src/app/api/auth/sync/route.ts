@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyMessage } from "viem";
+import { randomBytes } from "node:crypto";
+
+const NONCE_TTL_MS = 5 * 60 * 1000;
+function generateSessionPassword() {
+  return `ssdp-${randomBytes(32).toString("hex")}`;
+}
 
 const MASTER_WALLET = (
   process.env.MASTER_WALLET_ADDRESS ??
@@ -41,6 +47,37 @@ async function writeProfileOrThrow(
   }
 }
 
+export async function GET(req: NextRequest) {
+  try {
+    const wallet = req.nextUrl.searchParams.get("wallet");
+    if (!wallet) {
+      return NextResponse.json({ error: "Parameter wallet wajib diberikan." }, { status: 400 });
+    }
+    const addr = wallet.toLowerCase();
+    const nonce = randomBytes(16).toString("hex");
+    const timestamp = new Date().toISOString();
+    const message = `SSDP Login\nWallet: ${addr}\nNonce: ${nonce}\nTimestamp: ${timestamp}`;
+    const supabaseAdmin = getAdmin();
+
+    const { error } = await supabaseAdmin
+      .from("profil")
+      .update({ nonce, nonce_timestamp: timestamp })
+      .eq("wallet_address", addr);
+
+    if (error) {
+      const { data: existing } = await supabaseAdmin.from("profil").select("id").eq("wallet_address", addr).maybeSingle();
+      if (!existing) {
+        await supabaseAdmin.from("profil").insert({ id: crypto.randomUUID(), wallet_address: addr, role: "participant", nonce, nonce_timestamp: timestamp });
+      }
+    }
+
+    return NextResponse.json({ success: true, message, nonce, timestamp });
+  } catch (err: any) {
+    console.error("[auth/nonce]", err.message);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -59,7 +96,6 @@ export async function POST(req: NextRequest) {
       message,
       signature: signature as `0x${string}`,
     });
-
     if (!valid) {
       return NextResponse.json(
         { error: "Signature wallet tidak valid." },
@@ -67,9 +103,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const nonceMatch = message.match(/Nonce: ([a-f0-9]+)/);
+    const timestampMatch = message.match(/Timestamp: (.+)/);
+    const walletMatch = message.match(/Wallet: (0x[0-9a-fA-F]+)/);
+    
+    if (!nonceMatch || !timestampMatch || !walletMatch) {
+      return NextResponse.json({ error: "Format pesan signature tidak valid." }, { status: 400 });
+    }
+    if (walletMatch[1].toLowerCase() !== addr) {
+      return NextResponse.json({ error: "Wallet address di signature tidak cocok." }, { status: 400 });
+    }
+    
+    const nonce = nonceMatch[1];
+    const timestamp = new Date(timestampMatch[1]).getTime();
+    if (Date.now() - timestamp > NONCE_TTL_MS) {
+      return NextResponse.json({ error: "Signature sudah kedaluwarsa (maks 5 menit)." }, { status: 401 });
+    }
+    
+    const { data: profileData } = await supabaseAdmin.from("profil").select("nonce").eq("wallet_address", addr).maybeSingle();
+    if (!profileData || profileData.nonce !== nonce) {
+      return NextResponse.json({ error: "Nonce tidak valid atau sudah dipakai." }, { status: 401 });
+    }
+    
+    await supabaseAdmin.from("profil").update({ nonce: null, nonce_timestamp: null }).eq("wallet_address", addr);
+
     const addr = walletAddress.toLowerCase();
     const syntheticEmail = `${addr.slice(2)}@wallet.local`;
-    const syntheticPassword = `${addr}-ssdp-wallet-login`;
     const supabaseAdmin = getAdmin();
     const supabaseAuth = getAuthClient();
     let { data: existing } = (await supabaseAdmin
@@ -80,9 +139,10 @@ export async function POST(req: NextRequest) {
 
     let userId: string;
     let role: string;
+    const sessionPassword = generateSessionPassword();
     let signInResult = await supabaseAuth.auth.signInWithPassword({
       email: syntheticEmail,
-      password: syntheticPassword,
+      password: sessionPassword,
     });
 
     if (signInResult.data.session?.access_token && signInResult.data.user) {
@@ -112,7 +172,7 @@ export async function POST(req: NextRequest) {
       const { data: newUser, error: createErr } =
         await supabaseAdmin.auth.admin.createUser({
           email: syntheticEmail,
-          password: syntheticPassword,
+          password: sessionPassword,
           email_confirm: true,
           user_metadata: { wallet_address: addr },
         });
@@ -146,7 +206,7 @@ export async function POST(req: NextRequest) {
 
       signInResult = await supabaseAuth.auth.signInWithPassword({
         email: syntheticEmail,
-        password: syntheticPassword,
+        password: sessionPassword,
       });
     }
 
