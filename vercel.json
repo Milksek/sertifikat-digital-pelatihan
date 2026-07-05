@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "src/app/api/admin/preview-certificate/route.ts": {
+      "includeFiles": "public/certificate_template.png"
+    },
+    "src/app/api/admin/mint/route.ts": {
+      "includeFiles": "public/certificate_template.png"
+    }
+  }
+}
