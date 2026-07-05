@@ -57,12 +57,20 @@ function splitName(value: string, maxLength = 28) {
 }
 
 export async function renderCertificatePng(input: RenderCertificateInput) {
-  const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
-  const templateUrl = `${baseUrl}/certificate_template.png`;
-  const response = await fetch(templateUrl);
-  if (!response.ok) throw new Error("Gagal memuat template sertifikat.");
-  const buffer = Buffer.from(await response.arrayBuffer());
-  const template = sharp(buffer);
+  const candidates = [
+    path.join(process.cwd(), "public", "certificate_template.png"),
+    path.join(process.cwd(), "certificate_template.png"),
+    path.join(process.cwd(), ".next", "server", "app", "certificate_template.png"),
+  ];
+  let templateBuffer: Buffer | null = null;
+  for (const p of candidates) {
+    try {
+      templateBuffer = readFileSync(p);
+      break;
+    } catch {}
+  }
+  if (!templateBuffer) throw new Error("Template sertifikat tidak ditemukan di server.");
+  const template = sharp(templateBuffer);
   const metadata = await template.metadata();
 
   const width = metadata.width ?? 1600;
