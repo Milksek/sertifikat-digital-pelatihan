@@ -1,4 +1,4 @@
-=============================================================
+﻿=============================================================
 SSDP AUDIT LOG
 Generated: 2026-07-04 19:36:00 WIB
 Last Updated: Round 4 SQL applied to live Supabase
@@ -6,7 +6,7 @@ Last Updated: Round 4 SQL applied to live Supabase
 
 CONTRACT ADDRESS FINAL:
   Old (batchMintToMultiple only): 0x00a82b2977C1210c5470a87226b8C0Db9E3B0c48
-  Previous (soulbound mutable)  : 0x8Ad76629E76f6f6c3ffB55cB1219e6FB92866D36
+  Previous (soulbound mutable)  : 0x0C4F059b86D1715c8f78c032eB090eAAa5054C94
   FINAL (soulbound permanent)   : [PENDING DEPLOY - use address from Thirdweb]
 
 TOKEN NAME  : Sertifikat Pelatihan Digital
