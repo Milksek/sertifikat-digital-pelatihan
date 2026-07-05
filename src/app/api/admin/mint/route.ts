@@ -19,7 +19,7 @@ import {
   TRAINING_NAME,
 } from "@/lib/app-config";
 import { buildCertificateNumber } from "@/lib/certificate-number";
-import { renderCertificatePng } from "@/lib/certificate-renderer";
+import { renderCertificatePng } from "@/lib/cert-png-renderer";
 import { requireAdminUser, getAdminClient } from "@/lib/server-auth";
 
 export const runtime = "nodejs";
