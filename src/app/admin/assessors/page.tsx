@@ -53,13 +53,9 @@ export default function AdminAssessors() {
     if (!globalAssessorsCache) setLoading(true);
 
     try {
-      const token = localStorage.getItem("ssdp_token") || "";
       const res = await fetch("/api/admin/assessors", {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
       });
       const payload = await res.json();
@@ -105,18 +101,15 @@ export default function AdminAssessors() {
     try {
       setCreating(true);
 
-      const token = localStorage.getItem("ssdp_token") || "";
-      const res = await fetch("/api/admin/assessors", {
+      const res = await fetch("/api/auth/sync", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           walletAddress: wallet,
           fullName: form.fullName,
           email: form.email,
           phone: form.phone ? `+62${form.phone}` : undefined,
+          role: "assessor",
         }),
       });
       const syncData = await res.json();

@@ -21,7 +21,6 @@ CREATE TABLE public.profil (
     email TEXT,
     phone TEXT,
     nonce TEXT,
-    nonce_timestamp TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -170,7 +169,7 @@ CREATE INDEX IF NOT EXISTS idx_penilaian_assessor_id
 CREATE INDEX IF NOT EXISTS idx_penilaian_status
     ON public.penilaian(status);
 
--- handle_new_user: force role = 'participant' always, ignore metadata role
+-- Auto-create profil on auth signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -178,121 +177,16 @@ BEGIN
     VALUES (
         NEW.id,
         NEW.raw_user_meta_data->>'wallet_address',
-        'participant'
+        COALESCE(NEW.raw_user_meta_data->>'role', 'participant')
     );
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
-
--- Helper function to check if a user is an admin
-CREATE OR REPLACE FUNCTION public.is_admin(uid UUID)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  RETURN EXISTS (
-    SELECT 1
-    FROM public.profil
-    WHERE id = uid
-      AND role = 'admin'
-  );
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.is_admin(UUID) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.is_admin(UUID) TO authenticated;
-
--- RPC untuk verifikasi sertifikat publik dan pencatatan log
-CREATE OR REPLACE FUNCTION public.verify_certificate_public(
-    search_query TEXT,
-    verifier_ip_input TEXT
-)
-RETURNS TABLE (
-    certificate_number TEXT,
-    training_name TEXT,
-    training_field TEXT,
-    participant_wallet TEXT,
-    token_id TEXT,
-    tx_hash TEXT,
-    ipfs_image_uri TEXT,
-    metadata_uri TEXT,
-    status TEXT,
-    minted_at TIMESTAMPTZ,
-    revoked_at TIMESTAMPTZ,
-    revocation_reason TEXT,
-    participant_name TEXT,
-    recommendation TEXT,
-    score JSONB
-)
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-    found_cert RECORD;
-BEGIN
-    SELECT 
-        s.id AS cert_id,
-        s.certificate_number,
-        s.training_name,
-        s.training_field,
-        s.participant_wallet,
-        s.token_id,
-        s.tx_hash,
-        s.ipfs_image_uri,
-        s.metadata_uri,
-        s.status,
-        s.minted_at,
-        s.revoked_at,
-        s.revocation_reason,
-        p.full_name AS participant_name,
-        pen.recommendation,
-        pen.score
-    INTO found_cert
-    FROM public.sertifikat s
-    JOIN public.penilaian pen ON s.assessment_id = pen.id
-    JOIN public.profil p ON pen.participant_id = p.id
-    WHERE 
-        LOWER(s.certificate_number) = LOWER(TRIM(search_query))
-        OR LOWER(s.token_id) = LOWER(TRIM(search_query))
-        OR LOWER(s.participant_wallet) = LOWER(TRIM(search_query))
-    LIMIT 1;
-
-    IF found_cert.cert_id IS NOT NULL THEN
-        INSERT INTO public.log_verifikasi (certificate_id, verifier_ip, query)
-        VALUES (found_cert.cert_id, verifier_ip_input, search_query);
-
-        RETURN QUERY SELECT 
-            found_cert.certificate_number,
-            found_cert.training_name,
-            found_cert.training_field,
-            found_cert.participant_wallet,
-            found_cert.token_id,
-            found_cert.tx_hash,
-            found_cert.ipfs_image_uri,
-            found_cert.metadata_uri,
-            found_cert.status,
-            found_cert.minted_at,
-            found_cert.revoked_at,
-            found_cert.revocation_reason,
-            found_cert.participant_name,
-            found_cert.recommendation,
-            found_cert.score;
-    END IF;
-
-    RETURN;
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.verify_certificate_public(TEXT, TEXT) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.verify_certificate_public(TEXT, TEXT) TO service_role;
 
 -- ============================================================
 -- ROW LEVEL SECURITY
@@ -305,7 +199,7 @@ ALTER TABLE public.log_verifikasi ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.log_aktivitas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.log_transaksi ENABLE ROW LEVEL SECURITY;
 
--- profil: user sendiri bisa read, admin bisa baca semua. Writes via server-only API.
+-- profil: user sendiri bisa read/write, admin bisa baca semua
 CREATE POLICY "profil_select_own_or_admin" ON public.profil
     FOR SELECT USING (
         auth.uid() = id
@@ -314,8 +208,10 @@ CREATE POLICY "profil_select_own_or_admin" ON public.profil
             WHERE id = auth.uid() AND role = 'admin'
         )
     );
--- profil_insert_own and profil_update_own intentionally dropped
--- All profile writes go through server-side API using service role
+CREATE POLICY "profil_insert_own" ON public.profil
+    FOR INSERT WITH CHECK (auth.uid() = id);
+CREATE POLICY "profil_update_own" ON public.profil
+    FOR UPDATE USING (auth.uid() = id);
 
 -- penilaian: participant own row, assessor assigned row, admin semua
 CREATE POLICY "penilaian_select_role_based" ON public.penilaian

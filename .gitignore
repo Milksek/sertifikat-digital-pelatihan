@@ -41,3 +41,7 @@ remove-comments.js
 
 # smart contract build artifacts
 /artifacts/
+
+# cache & temp
+/cache/
+/supabase/.temp/

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { renderCertificateSvg } from "@/lib/certificate-renderer";
-import { buildCertificateNumber } from "@/lib/certificate-number";
+import { renderCertificatePng } from "@/lib/certificate-renderer";
 import { TRAINING_NAME, TRAINING_FIELD } from "@/lib/app-config";
 
 export const runtime = "nodejs";
@@ -27,6 +26,11 @@ function getAuthedClient(token: string) {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { autoRefreshToken: false, persistSession: false },
   });
+}
+
+function buildCertificateNumber(assessmentId: string) {
+  const cleanId = assessmentId.replace(/-/g, "").slice(0, 12).toUpperCase();
+  return `CERT-JWD-${cleanId}`;
 }
 
 export async function GET(req: NextRequest) {
@@ -74,7 +78,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Data penilaian tidak ditemukan." }, { status: 404 });
     }
 
-    
+    // Resolve certificate number if it already exists or generate a draft number
     const { data: existingCert } = await admin
       .from("sertifikat")
       .select("certificate_number")
@@ -84,7 +88,7 @@ export async function GET(req: NextRequest) {
     const certificateNumber = existingCert?.certificate_number || buildCertificateNumber(assessment.id);
     const issuedAt = new Date().toISOString();
 
-    const svg = renderCertificateSvg({
+    const imageBuffer = await renderCertificatePng({
       participantName: assessment.participant?.full_name || "Peserta",
       certificateNumber,
       trainingName: TRAINING_NAME,
@@ -94,9 +98,9 @@ export async function GET(req: NextRequest) {
       verifyUrl: `${req.nextUrl.origin}/verify?q=${certificateNumber}`,
     });
 
-    return new Response(svg, {
+    return new Response(imageBuffer, {
       headers: {
-        "Content-Type": "image/svg+xml",
+        "Content-Type": "image/png",
         "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
       },
     });

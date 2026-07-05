@@ -60,46 +60,15 @@ const globalLogsCache: Record<string, any[]> = {};
 
 function formatLogDetails(log: any) {
   if (!log.details) return "-";
-  try {
-    const p = typeof log.details === "string" ? JSON.parse(log.details) : log.details;
-    switch (log.action) {
-      case "mint_certificate":
-        return (
-          <div className="space-y-1">
-            <p>Sertifikat <span className="font-mono font-semibold text-slate-800">{p.certificate_number || "-"}</span></p>
-            <p>Wallet <span className="font-mono text-xs text-slate-500">{p.participant_wallet ? `${p.participant_wallet.slice(0, 6)}...${p.participant_wallet.slice(-4)}` : "-"}</span></p>
-            {p.token_id !== undefined && <p>Token ID <span className="font-mono font-semibold text-emerald-700">#{p.token_id}</span></p>}
-            {p.network && <p className="text-slate-400">Network: {p.network}</p>}
-          </div>
-        );
-      case "assign_assessor":
-        return (
-          <div className="space-y-1">
-            {p.assessor_name && <p>Asesor: <span className="font-semibold text-slate-800">{p.assessor_name}</span></p>}
-            {p.participant_name && <p>Peserta: <span className="font-semibold text-slate-800">{p.participant_name}</span></p>}
-            {p.training_name && <p className="text-slate-400">{p.training_name}</p>}
-          </div>
-        );
-      case "tambah_asesor":
-        return (
-          <div className="space-y-1">
-            {p.name && <p>Nama: <span className="font-semibold text-slate-800">{p.name}</span></p>}
-            {p.email && <p className="font-mono text-xs text-slate-500">{p.email}</p>}
-          </div>
-        );
-      case "pencabutan_sertifikat":
-        return (
-          <div className="space-y-1">
-            {p.certificate_number && <p>Sertifikat <span className="font-mono font-semibold text-slate-800">{p.certificate_number}</span></p>}
-            {p.reason && <p className="text-red-600">{p.reason}</p>}
-          </div>
-        );
-      default:
-        return <span className="text-slate-500 text-xs font-mono">{JSON.stringify(p, null, 0)}</span>;
+  if (log.action === "mint_certificate") {
+    try {
+      const parsed = typeof log.details === "string" ? JSON.parse(log.details) : log.details;
+      return `Mint sertifikat ${parsed.certificate_number} untuk wallet ${parsed.participant_wallet.slice(0, 8)}... (Token ID: ${parsed.token_id})`;
+    } catch {
+      return log.details;
     }
-  } catch {
-    return <span className="text-slate-500 text-xs">{log.details}</span>;
   }
+  return log.details;
 }
 
 export default function AdminLogs() {
@@ -266,7 +235,7 @@ export default function AdminLogs() {
                   </TableCell>
                   <TableCell>{getActionBadge(log.action)}</TableCell>
                   <TableCell className="text-sm text-slate-600 max-w-xs">
-                    {formatLogDetails(log)}
+                    <span className="line-clamp-2">{formatLogDetails(log)}</span>
                   </TableCell>
                 </TableRow>
               ))

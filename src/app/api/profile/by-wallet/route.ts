@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 function getAdmin() {
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     const admin = getAdmin();
     const { data: profile, error } = await admin
       .from("profil")
-      .select("wallet_address, full_name")
+      .select("id, wallet_address, full_name, role, nik, email, phone")
       .eq("wallet_address", wallet)
       .maybeSingle();
 

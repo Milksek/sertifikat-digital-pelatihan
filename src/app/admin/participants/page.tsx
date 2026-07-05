@@ -31,13 +31,9 @@ export default function AdminParticipants() {
   useEffect(() => {
     async function fetchParticipants() {
       try {
-        const token = localStorage.getItem("ssdp_token") || "";
         const res = await fetch("/api/admin/participants", {
           method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { "Content-Type": "application/json" },
           cache: "no-store",
         });
 

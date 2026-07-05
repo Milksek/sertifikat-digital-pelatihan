@@ -1,12 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAdminUser } from "@/lib/server-auth";
+﻿import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
-export async function GET(req: NextRequest) {
+let _supabaseAdmin = null;
+
+function getAdmin() {
+  if (!_supabaseAdmin) {
+    _supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      { auth: { autoRefreshToken: false, persistSession: false } },
+    );
+  }
+  return _supabaseAdmin;
+}
+
+export async function GET() {
   try {
-    await requireAdminUser(req);
-
-    const { getAdminClient } = await import("@/lib/server-auth");
-    const supabaseAdmin = getAdminClient();
+    const supabaseAdmin = getAdmin();
 
     const { data: rawProfiles, error: profileError } = await supabaseAdmin
       .from("profil")
@@ -31,13 +41,13 @@ export async function GET(req: NextRequest) {
       throw new Error(`Gagal memuat sertifikat peserta: ${certResult.error.message}`);
     }
 
-    const assessCounts = (assessResult.data || []).reduce((acc: Record<string, number>, curr) => {
+    const assessCounts = (assessResult.data || []).reduce((acc, curr) => {
       if (!curr?.participant_id) return acc;
       acc[curr.participant_id] = (acc[curr.participant_id] || 0) + 1;
       return acc;
     }, {});
 
-    const certCounts = (certResult.data || []).reduce((acc: Record<string, number>, curr) => {
+    const certCounts = (certResult.data || []).reduce((acc, curr) => {
       if (!curr?.participant_wallet) return acc;
       const wallet = curr.participant_wallet.toLowerCase();
       acc[wallet] = (acc[wallet] || 0) + 1;
@@ -54,12 +64,11 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true, participants });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[admin/participants]", error?.message || error);
-    const status = error.message?.includes("Akses ditolak") ? 403 : error.message?.includes("Token login") ? 401 : 500;
     return NextResponse.json(
       { success: false, error: error?.message || "Gagal memuat peserta" },
-      { status },
+      { status: 500 },
     );
   }
 }

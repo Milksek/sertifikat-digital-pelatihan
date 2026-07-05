@@ -26,14 +26,22 @@ export default function ParticipantDashboardPage() {
     let mounted = true;
     async function load() {
       startTransition(() => { setLoading(true); });
-      const [assessResult, certResult, profileResult] = await Promise.all([
-        supabase.from("penilaian").select("id, status, created_at").eq("participant_id", user.id).order("created_at", { ascending: false }).limit(6),
-        supabase.from("sertifikat").select("id, certificate_number, status, minted_at").eq("participant_wallet", user.wallet_address?.toLowerCase() ?? "").order("created_at", { ascending: false }).limit(5),
-        supabase.from("profil").select("full_name, nik, wallet_address").eq("id", user.id).maybeSingle(),
-      ]);
-      if (!mounted) return;
-      setData({ assessments: (assessResult.data as AssessmentRow[]) || [], certificates: (certResult.data as CertRow[]) || [], profile: profileResult.data as DashboardData["profile"] });
-      setLoading(false);
+      try {
+        const token = localStorage.getItem("ssdp_token");
+        const [assessResult, profileResult, certificatesPayload] = await Promise.all([
+          supabase.from("penilaian").select("id, status, created_at").eq("participant_id", user.id).order("created_at", { ascending: false }).limit(6),
+          supabase.from("profil").select("full_name, nik, wallet_address").eq("id", user.id).maybeSingle(),
+          token
+            ? fetch("/api/participant/certificates", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" })
+                .then(async (response) => response.ok ? await response.json() : { items: [] })
+                .catch(() => ({ items: [] }))
+            : Promise.resolve({ items: [] }),
+        ]);
+        if (!mounted) return;
+        setData({ assessments: (assessResult.data as AssessmentRow[]) || [], certificates: (certificatesPayload.items as CertRow[]) || [], profile: profileResult.data as DashboardData["profile"] });
+      } finally {
+        if (mounted) setLoading(false);
+      }
     }
     load().catch(() => { if (!mounted) return; setData({ assessments: [], certificates: [], profile: null }); setLoading(false); });
     return () => { mounted = false; };
@@ -41,7 +49,7 @@ export default function ParticipantDashboardPage() {
 
   const kpis = useMemo(() => [
     { label: "Total Penilaian", value: data.assessments.length, icon: ClipboardList, tone: "border-blue-100 bg-blue-50 text-blue-700", note: "Penilaian yang pernah diikuti" },
-    { label: "Sertifikat Terbit", value: data.certificates.filter((c) => c.status === "minted").length, icon: Award, tone: "border-emerald-100 bg-emerald-50 text-emerald-700", note: "Sertifikat yang sudah diterbitkan" },
+    { label: "Sertifikat Terbit", value: data.certificates.filter((c) => c.status === "minted" || c.status === "certified").length, icon: Award, tone: "border-emerald-100 bg-emerald-50 text-emerald-700", note: "Sertifikat yang sudah diterbitkan" },
   ], [data]);
   const shortWallet = (w?: string | null) => w ? `${w.slice(0, 8)}...${w.slice(-6)}` : "-";
 

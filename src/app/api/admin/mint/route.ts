@@ -18,8 +18,7 @@ import {
   TRAINING_FIELD,
   TRAINING_NAME,
 } from "@/lib/app-config";
-import { buildCertificateNumber } from "@/lib/certificate-number";
-import { requireAdminUser, getAdminClient } from "@/lib/server-auth";
+import { renderCertificatePng } from "@/lib/certificate-renderer";
 
 export const runtime = "nodejs";
 
@@ -58,7 +57,28 @@ type Assessment = {
   } | null;
 };
 
-// auth helper functions removed - now using server-auth.ts
+function getAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error("Supabase server environment belum lengkap.");
+  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+}
+
+function getBearerToken(req: NextRequest) {
+  const auth = req.headers.get("authorization") || "";
+  if (!auth.startsWith("Bearer ")) return null;
+  return auth.slice(7);
+}
+
+function getAuthedClient(token: string) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) throw new Error("Supabase auth environment belum lengkap.");
+  return createClient(url, key, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
 
 function normalizePrivateKey(value: string) {
   return (value.startsWith("0x") ? value : `0x${value}`) as `0x${string}`;
@@ -69,30 +89,9 @@ function toIpfsGateway(uri: string | null) {
   return uri.startsWith("ipfs://") ? `https://ipfs.io/ipfs/${uri.slice(7)}` : uri;
 }
 
-async function renderCertificateImage(origin: string, payload: {
-  participantName: string;
-  certificateNumber: string;
-  trainingName: string;
-  trainingField: string;
-  issuedAt: string;
-  walletAddress: string;
-}) {
-  const params = new URLSearchParams({
-    participantName: payload.participantName,
-    certificateNumber: payload.certificateNumber,
-    trainingName: payload.trainingName,
-    trainingField: payload.trainingField,
-    issuedAt: payload.issuedAt,
-    walletAddress: payload.walletAddress,
-  });
-  const response = await fetch(`${origin}/api/admin/render-certificate?${params.toString()}`, {
-    method: "GET",
-    cache: "no-store",
-  });
-  if (!response.ok) {
-    throw new Error("Gagal merender gambar sertifikat final.");
-  }
-  return Buffer.from(await response.arrayBuffer());
+function buildCertificateNumber(assessmentId: string) {
+  const suffix = assessmentId.replace(/-/g, "").slice(0, 8).toUpperCase();
+  return `SDP-JWD-${suffix}`;
 }
 
 async function uploadJsonToPinata(fileName: string, payload: object) {
@@ -149,10 +148,29 @@ async function uploadImageToPinata(fileName: string, bytes: Buffer) {
   };
 }
 
-// requireAdminUser function removed - now using server-auth.ts
+async function requireAdminUser(req: NextRequest) {
+  const token = getBearerToken(req);
+  if (!token) throw new Error("Token login admin tidak ditemukan.");
+
+  const authed = getAuthedClient(token);
+  const { data: userData, error: userError } = await authed.auth.getUser();
+  if (userError || !userData.user) throw new Error("Sesi admin tidak valid.");
+
+  const admin = getAdmin();
+  const { data: profile, error: profileError } = await admin
+    .from("profil")
+    .select("id,role,wallet_address,full_name,email")
+    .eq("id", userData.user.id)
+    .maybeSingle();
+
+  if (profileError || !profile) throw new Error("Profil admin tidak ditemukan.");
+  if ((profile as Profile).role !== "admin") throw new Error("Hanya admin yang boleh melakukan mint.");
+
+  return profile as Profile;
+}
 
 async function getAssessmentOrThrow(assessmentId: string) {
-  const admin = getAdminClient();
+  const admin = getAdmin();
   const { data, error } = await admin
     .from("penilaian")
     .select(`
@@ -184,7 +202,7 @@ export async function POST(req: NextRequest) {
     }
 
     const assessment = await getAssessmentOrThrow(String(assessmentId));
-    const admin = getAdminClient();
+    const admin = getAdmin();
 
     const existingCertificate = await admin
       .from("sertifikat")
@@ -198,13 +216,14 @@ export async function POST(req: NextRequest) {
 
     const certificateNumber = existingCertificate.data?.certificate_number || buildCertificateNumber(assessment.id);
     const issuedAt = new Date().toISOString();
-    const certificateImage = await renderCertificateImage(req.nextUrl.origin, {
+    const certificateImage = await renderCertificatePng({
       participantName: assessment.participant?.full_name || "Peserta",
       certificateNumber,
       trainingName: TRAINING_NAME,
       trainingField: TRAINING_FIELD,
       issuedAt,
       walletAddress: assessment.participant!.wallet_address,
+      verifyUrl: `${req.nextUrl.origin}/verify?q=${certificateNumber}`,
     });
     const imageUpload = await uploadImageToPinata(`${certificateNumber}.png`, certificateImage);
     const metadataPayload = {
