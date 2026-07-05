@@ -131,7 +131,7 @@ export default function AdminMintPage() {
                   <p className="text-[9px] font-semibold tracking-[3px] text-white/70 uppercase">NOMOR SERTIFIKAT</p>
                   <p className="text-sm font-bold text-white mt-1 font-mono">{previewData.certNo}</p>
                 </div>
-                <div className="absolute top-[46%] left-[33%] right-[5%] text-center">
+                <div className="absolute top-[43%] left-[33%] right-[5%] text-center">
                   <p className="text-3xl font-extrabold text-white mt-2 leading-tight">{previewData.name}</p>
                 </div>
                 <div className="absolute top-[69%] left-[30%] right-[5%] text-center">
