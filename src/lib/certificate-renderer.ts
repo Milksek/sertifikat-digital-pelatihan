@@ -151,4 +151,61 @@ export function renderCertificateSvg(input: RenderCertificateInput): string {
 </svg>`;
 }
 
+// sharp-based PNG renderer — composites text onto Canva template
+// ponytail: needs sharp + public/certificate_template.png, add when Vercel serverless
+export async function renderCertificatePng(input: RenderCertificateInput): Promise<Buffer> {
+  const sharp = (await import("sharp")).default;
+  const path = (await import("path"));
+  const fs = (await import("fs"));
 
+  const candidates = [
+    path.join(process.cwd(), "public", "certificate_template.png"),
+    path.join(process.cwd(), "src", "app", "api", "admin", "preview-certificate", "certificate_template.png"),
+    path.join(process.cwd(), "src", "app", "api", "admin", "mint", "certificate_template.png"),
+  ];
+
+  let templateBuffer: Buffer | null = null;
+  for (const p of candidates) {
+    try { templateBuffer = fs.readFileSync(p); break; } catch {}
+  }
+  if (!templateBuffer) throw new Error("Template sertifikat tidak ditemukan di server.");
+
+  const template = sharp(templateBuffer);
+  const metadata = await template.metadata();
+  const width = metadata.width ?? 2000;
+  const height = metadata.height ?? 2000;
+
+  const participantLines = splitName(input.participantName);
+  const safeLines = participantLines.map(escapeSvg);
+
+  const overlay = `
+    <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+      <style>
+        .name { fill: #ffffff; font-size: ${Math.round(width * 0.048)}px; font-weight: 700; font-family: 'Poppins', sans-serif; }
+        .label { fill: #ffffff; font-size: ${Math.round(width * 0.015)}px; font-weight: 600; font-family: 'Poppins', sans-serif; letter-spacing: 1.2px; }
+        .value { fill: #ffffff; font-size: ${Math.round(width * 0.018)}px; font-weight: 700; font-family: 'Poppins', sans-serif; }
+        .field { fill: #ffffff; font-size: ${Math.round(width * 0.015)}px; font-weight: 400; font-family: 'Poppins', sans-serif; }
+      </style>
+
+      <text x="64%" y="52%" text-anchor="middle" class="name">${safeLines[0] ?? "Peserta"}</text>
+      ${safeLines[1] ? `<text x="68%" y="58.8%" text-anchor="middle" class="name">${safeLines[1]}</text>` : ""}
+
+      <text x="54%" y="73%" text-anchor="middle" class="value">${escapeSvg(input.trainingName)}</text>
+      <text x="68%" y="68%" text-anchor="middle" class="field">${escapeSvg(input.trainingField)}</text>
+
+      <text x="5%" y="5%" class="label">NOMOR SERTIFIKAT</text>
+      <text x="5%" y="8%" class="value">${escapeSvg(input.certificateNumber)}</text>
+
+      <text x="45%" y="78%" class="label">TANGGAL TERBIT</text>
+      <text x="45%" y="81%" class="value">${escapeSvg(formatIssuedDate(input.issuedAt))}</text>
+
+      <text x="65%" y="78%" class="label">WALLET PESERTA</text>
+      <text x="65%" y="81%" class="value">${escapeSvg(shortenWallet(input.walletAddress))}</text>
+    </svg>
+  `;
+
+  return template
+    .composite([{ input: Buffer.from(overlay), top: 0, left: 0 }])
+    .png()
+    .toBuffer();
+}
