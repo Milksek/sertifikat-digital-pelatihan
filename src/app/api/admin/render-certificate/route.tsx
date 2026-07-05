@@ -6,8 +6,8 @@ import { CertificateRenderTemplate, type CertificateRenderData } from "@/lib/cer
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-let regularFont: ArrayBuffer | null = null;
-let boldFont: ArrayBuffer | null = null;
+let regularFont: Buffer | null = null;
+let boldFont: Buffer | null = null;
 
 function loadFont(name: string) {
   const filePath = join(process.cwd(), "src", "fonts", name);
@@ -29,8 +29,8 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const data = getData(url);
 
-  regularFont ||= loadFont("Poppins-Regular.woff2");
-  boldFont ||= loadFont("Poppins-Bold.woff2");
+  regularFont ||= loadFont("Poppins-Regular.ttf");
+  boldFont ||= loadFont("Poppins-Bold.ttf");
 
   return new ImageResponse(
     <CertificateRenderTemplate data={data} size={1200} />,
