@@ -51,8 +51,10 @@ const initialState: DashboardMetricState = {
 
 const actionLabel = (action?: string | null) => {
   switch (action) {
-    case "mint_nft": return "Mint NFT";
+    case "mint_certificate": return "Mint Sertifikat";
     case "pencabutan_sertifikat": return "Pencabutan Sertifikat";
+    case "assign_assessor": return "Penugasan Asesor";
+    case "tambah_asesor": return "Tambah Asesor";
     case "penilaian_disetujui": return "Penilaian Disetujui";
     case "penilaian_ditolak": return "Penilaian Ditolak";
     default: return action || "Aktivitas Sistem";
@@ -61,13 +63,32 @@ const actionLabel = (action?: string | null) => {
 
 const actionBadgeClass = (action?: string | null) => {
   switch (action) {
-    case "mint_nft": return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "mint_certificate": return "border-emerald-200 bg-emerald-50 text-emerald-700";
     case "penilaian_disetujui": return "border-blue-200 bg-blue-50 text-blue-700";
     case "penilaian_ditolak": return "border-amber-200 bg-amber-50 text-amber-700";
     case "pencabutan_sertifikat": return "border-red-200 bg-red-50 text-red-700";
+    case "assign_assessor": return "border-blue-200 bg-blue-50 text-blue-700";
+    case "tambah_asesor": return "border-indigo-200 bg-indigo-50 text-indigo-700";
     default: return "border-slate-200 bg-slate-50 text-slate-600";
   }
 };
+
+function formatDetail(details: string | null) {
+  if (!details) return <span className="text-slate-400">Tanpa detail tambahan</span>;
+  try {
+    const p = typeof details === "string" ? JSON.parse(details) : details;
+    if (p.certificate_number) return (
+      <div className="space-y-0.5">
+        <p>Sertifikat <span className="font-mono font-semibold text-slate-800">{p.certificate_number}</span></p>
+        {p.participant_wallet && <p className="font-mono text-xs text-slate-500">{p.participant_wallet.slice(0,6)}...{p.participant_wallet.slice(-4)}</p>}
+        {p.token_id !== undefined && <p className="text-emerald-700 font-semibold">Token #{p.token_id}</p>}
+      </div>
+    );
+    return <span>{details}</span>;
+  } catch {
+    return <span>{details}</span>;
+  }
+}
 
 export default function AdminDashboard() {
   const [data, setData] = useState<DashboardMetricState>(initialState);
@@ -148,7 +169,7 @@ export default function AdminDashboard() {
               <Table>
                 <TableHeader className="bg-slate-50"><TableRow><TableHead>Waktu</TableHead><TableHead>Pengguna</TableHead><TableHead>Aksi</TableHead><TableHead>Detail</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {loading ? <TableRow><TableCell colSpan={4} className="py-10 text-center text-slate-500">Memuat aktivitas terbaru...</TableCell></TableRow> : data.recentLogs.length === 0 ? <TableRow><TableCell colSpan={4} className="py-10 text-center text-slate-500">Belum ada aktivitas yang tercatat.</TableCell></TableRow> : data.recentLogs.map((log) => <TableRow key={log.id}><TableCell className="whitespace-nowrap text-xs text-slate-500">{new Date(log.created_at).toLocaleString("id-ID")}</TableCell><TableCell><div><p className="font-medium text-slate-900">{log.profil?.full_name || "Sistem"}</p><p className="text-xs text-slate-400">{log.profil?.email || "-"}</p></div></TableCell><TableCell><Badge variant="outline" className={actionBadgeClass(log.action)}>{actionLabel(log.action)}</Badge></TableCell><TableCell className="max-w-md text-sm text-slate-600"><span className="line-clamp-2">{log.details || "Tanpa detail tambahan"}</span></TableCell></TableRow>)}
+                  {loading ? <TableRow><TableCell colSpan={4} className="py-10 text-center text-slate-500">Memuat aktivitas terbaru...</TableCell></TableRow> : data.recentLogs.length === 0 ? <TableRow><TableCell colSpan={4} className="py-10 text-center text-slate-500">Belum ada aktivitas yang tercatat.</TableCell></TableRow> : data.recentLogs.map((log) => <TableRow key={log.id}><TableCell className="whitespace-nowrap text-xs text-slate-500">{new Date(log.created_at).toLocaleString("id-ID")}</TableCell><TableCell><div><p className="font-medium text-slate-900">{log.profil?.full_name || "Sistem"}</p><p className="text-xs text-slate-400">{log.profil?.email || "-"}</p></div></TableCell><TableCell><Badge variant="outline" className={actionBadgeClass(log.action)}>{actionLabel(log.action)}</Badge></TableCell><TableCell className="max-w-md text-sm text-slate-600">{formatDetail(log.details)}</TableCell></TableRow>)}
                 </TableBody>
               </Table>
             </div>
