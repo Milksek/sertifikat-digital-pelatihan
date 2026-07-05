@@ -22,7 +22,7 @@ export default function AdminMintPage() {
   const [mintingId, setMintingId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewData, setPreviewData] = useState<{name:string; certNo:string; date:string; wallet:string; training:string; field:string} | null>(null);
+  const [previewData, setPreviewData] = useState<{ name: string; certNo: string; date: string; wallet: string; training: string; field: string } | null>(null);
   const [previewName, setPreviewName] = useState<string | null>(null);
 
 
@@ -62,9 +62,9 @@ export default function AdminMintPage() {
     const wallet = items.find(i => i.id === assessmentId)?.participant?.wallet_address || "0x0000000000000000000000000000000000000000";
     setPreviewData({
       name: participantName,
-      certNo: `SSDP-JWD-${assessmentId.slice(0,8).toUpperCase()}`,
+      certNo: `SSDP-JWD-${assessmentId.slice(0, 8).toUpperCase()}`,
       date: new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "long", year: "numeric" }).format(),
-      wallet: wallet.length > 15 ? `${wallet.slice(0,6)}...${wallet.slice(-4)}` : wallet,
+      wallet: wallet.length > 15 ? `${wallet.slice(0, 6)}...${wallet.slice(-4)}` : wallet,
       training: TRAINING_NAME,
       field: TRAINING_FIELD,
     });
@@ -127,24 +127,24 @@ export default function AdminMintPage() {
                   crossOrigin="anonymous"
                 />
                 {/* Text overlays positioned to match Canva template */}
-                <div className="absolute top-[10%] left-[8%] right-[42%] text-center">
-                  <p className="text-[10px] font-semibold tracking-[3px] text-white/70 uppercase">NOMOR SERTIFIKAT</p>
+                <div className="absolute top-[2%] left-[10%] right-[8%] text-text-right">
+                  <p className="text-[9px] font-semibold tracking-[3px] text-white/70 uppercase">NOMOR SERTIFIKAT</p>
                   <p className="text-sm font-bold text-white mt-1 font-mono">{previewData.certNo}</p>
                 </div>
-                <div className="absolute top-[38%] left-[35%] right-[5%] text-center">
-                  <p className="text-[10px] font-semibold tracking-[3px] text-white/70 uppercase">Diberikan Kepada</p>
+                <div className="absolute top-[46%] left-[33%] right-[5%] text-center">
                   <p className="text-3xl font-extrabold text-white mt-2 leading-tight">{previewData.name}</p>
                 </div>
-                <div className="absolute top-[55%] left-[35%] right-[5%] text-center">
-                  <p className="text-sm font-bold text-white">Atas Penyelesaian Pelatihan</p>
+                <div className="absolute top-[69%] left-[30%] right-[5%] text-center">
                   <p className="text-xl font-bold text-white mt-1">{previewData.training}</p>
-                  <p className="text-sm text-white/60 mt-1">Bidang: {previewData.field}</p>
                 </div>
-                <div className="absolute bottom-[15%] left-[5%] right-[55%] text-center">
+                <div className="absolute top-[65%] left-[47.8%] right-[5%] text-center">
+                  <p className="text-sm text-white/80 mt-1">{previewData.field}</p>
+                </div>
+                <div className="absolute bottom-[18%] left-[40%] w-[25%] text-center">
                   <p className="text-[9px] font-semibold tracking-[2px] text-white/60 uppercase">Tanggal Terbit</p>
                   <p className="text-xs font-bold text-white mt-1">{previewData.date}</p>
                 </div>
-                <div className="absolute bottom-[15%] left-[45%] right-[5%] text-center">
+                <div className="absolute bottom-[18%] left-[61%] w-[25%] text-center">
                   <p className="text-[9px] font-semibold tracking-[2px] text-white/60 uppercase">Wallet Peserta</p>
                   <p className="text-xs font-bold text-white mt-1 font-mono">{previewData.wallet}</p>
                 </div>
