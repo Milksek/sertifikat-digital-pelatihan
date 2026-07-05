@@ -264,6 +264,25 @@ export default function VerifyPage() {
                   </div>
                 </div>
 
+                {result.ipfs_image_uri && (
+                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 mb-4">Gambar Sertifikat</p>
+                    <a
+                      href={result.ipfs_image_uri.startsWith("ipfs://") ? `https://ipfs.io/ipfs/${result.ipfs_image_uri.replace("ipfs://", "")}` : result.ipfs_image_uri}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block overflow-hidden rounded-2xl border border-slate-200 transition hover:shadow-md"
+                    >
+                      <img
+                        src={result.ipfs_image_uri.startsWith("ipfs://") ? `https://ipfs.io/ipfs/${result.ipfs_image_uri.replace("ipfs://", "")}` : result.ipfs_image_uri}
+                        alt={`Sertifikat ${result.certificate_number}`}
+                        className="w-full h-auto"
+                        loading="lazy"
+                      />
+                    </a>
+                  </div>
+                )}
+
                 <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                   <div className="grid gap-4 md:grid-cols-2">
                     <Field label="Nomor Sertifikat" value={result.certificate_number} />
