@@ -8,10 +8,10 @@ function generateSessionPassword() {
   return `ssdp-${randomBytes(32).toString("hex")}`;
 }
 
-const MASTER_WALLET = (
+const MASTER_WALLETS = (
   process.env.MASTER_WALLET_ADDRESS ??
   "0x1cb90a414ade635dcfa78e41a825c789edde4d8e"
-).toLowerCase();
+).split(",").map((w) => w.trim().toLowerCase());
 let _supabaseAdmin: ReturnType<typeof createClient> | null = null;
 let _supabaseAuth: ReturnType<typeof createClient> | null = null;
 
@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
         password: sessionPassword,
       });
       userId = existing.id;
-      role = addr === MASTER_WALLET
+      role = MASTER_WALLETS.includes(addr)
         ? "admin"
         : existing.role ?? "participant";
       const profilePayload: any = {
@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
         );
 
       userId = newUser.user.id;
-      role = addr === MASTER_WALLET
+      role = MASTER_WALLETS.includes(addr)
         ? "admin"
         : existing?.role ?? "participant";
       const profilePayload: any = {
@@ -199,9 +199,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (fullName || bodyEmail || phone || nik || addr === MASTER_WALLET) {
+    if (fullName || bodyEmail || phone || nik || MASTER_WALLETS.includes(addr)) {
       const updatePayload: any = {};
-      if (addr === MASTER_WALLET) updatePayload.role = "admin";
+      if (MASTER_WALLETS.includes(addr)) updatePayload.role = "admin";
       if (fullName) updatePayload.full_name = fullName;
       if (bodyEmail) updatePayload.email = bodyEmail;
       if (phone) updatePayload.phone = phone;
@@ -224,7 +224,7 @@ export async function POST(req: NextRequest) {
       );
     }
     const accessToken = signInResult.data.session.access_token;
-    const isNewUser = addr !== MASTER_WALLET && !existing?.full_name;
+    const isNewUser = !MASTER_WALLETS.includes(addr) && !existing?.full_name;
     return NextResponse.json({
       success: true,
       isNewUser,
