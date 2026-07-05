@@ -109,3 +109,11 @@ export function renderCertificateSvg(input: RenderCertificateInput): string {
   <text x="1130" y="1090" text-anchor="middle" fill="#64748b" font-size="16" font-family="sans-serif">Terverifikasi secara on-chain di Polygon Amoy Testnet</text>
 </svg>`;
 }
+
+export async function renderCertificatePng(input: RenderCertificateInput): Promise<Buffer> {
+  const { Resvg } = await import("@resvg/resvg-js");
+  const svg = renderCertificateSvg(input);
+  const resvg = new Resvg(svg, { fitTo: { mode: "width", value: 1600 } });
+  const pngData = resvg.render();
+  return Buffer.from(pngData.asPng());
+}
