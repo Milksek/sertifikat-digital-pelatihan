@@ -75,7 +75,7 @@ export function CertificateRenderTemplate({ data, size = 1200 }: { data: Certifi
         {nameLines[1] ? <div style={{ marginTop: 3, fontSize: 49, fontWeight: 700 }}>{nameLines[1]}</div> : null}
       </div>
       <div style={{ position: "absolute", top: "66.2%", left: "51%", right: "13%", display: "flex", justifyContent: "center", textAlign: "center", color: "rgba(255,255,255,0.82)", fontFamily: "Arial, Helvetica, sans-serif", fontSize: 20 }}>{data.trainingField}</div>
-      <div style={{ position: "absolute", top: "70.5%", left: "28%", right: "13%", display: "flex", justifyContent: "center", textAlign: "center", color: "#ffffff", fontFamily: "Arial, Helvetica, sans-serif", fontSize: 28, fontWeight: 700 }}>{data.trainingName}</div>
+      <div style={{ position: "absolute", top: "70.5%", left: "100%", right: "13%", display: "flex", justifyContent: "center", textAlign: "center", color: "#ffffff", fontFamily: "Arial, Helvetica, sans-serif", fontSize: 28, fontWeight: 700 }}>{data.trainingName}</div>
       <div style={{ position: "absolute", bottom: "20%", left: "45%", width: "16%", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", color: "#ffffff", fontFamily: "Arial, Helvetica, sans-serif" }}>
         <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: 2, color: "rgba(255,255,255,0.62)", textTransform: "uppercase" }}>Tanggal Terbit</div>
         <div style={{ marginTop: 4, fontSize: 20, fontWeight: 700 }}>{dateText}</div>

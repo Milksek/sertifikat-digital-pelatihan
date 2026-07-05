@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createPublicClient, http, parseAbi } from "viem";
 import { polygonAmoy } from "viem/chains";
+import { TRAINING_FIELD, TRAINING_NAME } from "@/lib/app-config";
 
 // ============================================================
 // Polygon Amoy on-chain client (read-only, no wallet needed)
@@ -80,6 +81,57 @@ async function checkOnChain(tokenId: string | null, participantWallet: string | 
   }
 }
 
+async function findCertificateByTokenId(supabase: ReturnType<typeof getAdmin>, tokenId: string) {
+  const normalizedTokenId = tokenId.trim();
+  if (!normalizedTokenId || !/^\d+$/.test(normalizedTokenId)) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("sertifikat")
+    .select(`
+      certificate_number,
+      participant_wallet,
+      token_id,
+      tx_hash,
+      ipfs_image_uri,
+      metadata_uri,
+      status,
+      minted_at,
+      revoked_at,
+      revocation_reason,
+      assessment:penilaian!assessment_id(
+        recommendation,
+        score,
+        participant:profil!participant_id(full_name)
+      )
+    `)
+    .eq("token_id", normalizedTokenId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return {
+    certificate_number: data.certificate_number,
+    training_name: TRAINING_NAME,
+    training_field: TRAINING_FIELD,
+    participant_wallet: data.participant_wallet,
+    token_id: data.token_id,
+    tx_hash: data.tx_hash,
+    ipfs_image_uri: data.ipfs_image_uri,
+    metadata_uri: data.metadata_uri,
+    status: data.status,
+    minted_at: data.minted_at,
+    revoked_at: data.revoked_at,
+    revocation_reason: data.revocation_reason,
+    participant_name: data.assessment?.participant?.full_name ?? null,
+    recommendation: data.assessment?.recommendation ?? null,
+    score: data.assessment?.score ?? null,
+  };
+}
+
 // ============================================================
 // POST /api/public/verify
 // ============================================================
@@ -105,7 +157,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const result = Array.isArray(data) ? data[0] : data;
+    const rpcResult = Array.isArray(data) ? data[0] : data;
+    const result = rpcResult ?? await findCertificateByTokenId(supabase, trimmed);
     if (!result) {
       return NextResponse.json({ found: false, error: "Sertifikat tidak ditemukan." }, { status: 404 });
     }

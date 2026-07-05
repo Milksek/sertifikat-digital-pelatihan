@@ -222,7 +222,7 @@ export default function VerifyPage() {
                       id="verify-query"
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
-                      placeholder="Contoh: CERT-20260703-000001, token ID, atau 0x..."
+                      placeholder="Masukkan nomor sertifikat, token ID, atau wallet address"
                       className="h-12 rounded-xl border-slate-300 pl-11"
                       aria-label="Nomor sertifikat, token ID, atau wallet address"
                     />
@@ -231,7 +231,7 @@ export default function VerifyPage() {
                     {loading ? "Memverifikasi..." : "Verifikasi"}
                   </Button>
                 </div>
-                <p className="text-sm text-slate-500">Gunakan data sertifikat yang kamu punya agar hasil verifikasi lebih cepat dan akurat.</p>
+                <p className="text-sm text-slate-500">Gunakan salah satu dari tiga data ini: nomor sertifikat, token ID, atau wallet address peserta.</p>
               </form>
             </div>
 
@@ -263,25 +263,6 @@ export default function VerifyPage() {
                     </span>
                   </div>
                 </div>
-
-                {result.ipfs_image_uri && (
-                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 mb-4">Gambar Sertifikat</p>
-                    <a
-                      href={result.ipfs_image_uri.startsWith("ipfs://") ? `https://ipfs.io/ipfs/${result.ipfs_image_uri.replace("ipfs://", "")}` : result.ipfs_image_uri}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block overflow-hidden rounded-2xl border border-slate-200 transition hover:shadow-md"
-                    >
-                      <img
-                        src={result.ipfs_image_uri.startsWith("ipfs://") ? `https://ipfs.io/ipfs/${result.ipfs_image_uri.replace("ipfs://", "")}` : result.ipfs_image_uri}
-                        alt={`Sertifikat ${result.certificate_number}`}
-                        className="w-full h-auto"
-                        loading="lazy"
-                      />
-                    </a>
-                  </div>
-                )}
 
                 <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                   <div className="grid gap-4 md:grid-cols-2">
@@ -338,7 +319,7 @@ export default function VerifyPage() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-slate-950">Apa yang bisa dicek?</p>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">Status sertifikat, identitas pelatihan, token ID, hash transaksi, metadata, dan kecocokan wallet on-chain.</p>
+                  <p className="mt-2 text-sm leading-7 text-slate-600">Nomor sertifikat, token ID, wallet address peserta, status sertifikat, hash transaksi, dan kecocokan data on-chain.</p>
                 </div>
               </div>
             </div>

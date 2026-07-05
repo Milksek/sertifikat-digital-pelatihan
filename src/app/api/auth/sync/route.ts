@@ -1,17 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { verifyMessage } from "viem";
-import { randomBytes } from "node:crypto";
 
-const NONCE_TTL_MS = 5 * 60 * 1000;
-function generateSessionPassword() {
-  return `ssdp-${randomBytes(32).toString("hex")}`;
-}
-
-const MASTER_WALLETS = (
+const MASTER_WALLET = (
   process.env.MASTER_WALLET_ADDRESS ??
   "0x1cb90a414ade635dcfa78e41a825c789edde4d8e"
-).split(",").map((w) => w.trim().toLowerCase());
+).toLowerCase();
 let _supabaseAdmin: ReturnType<typeof createClient> | null = null;
 let _supabaseAuth: ReturnType<typeof createClient> | null = null;
 
@@ -37,6 +30,52 @@ function getAuthClient() {
   return _supabaseAuth;
 }
 
+function normalizeRole(addr: string, role?: string | null) {
+  return addr === MASTER_WALLET ? "admin" : role ?? "participant";
+}
+
+async function findAuthUserByEmail(email: string) {
+  const supabaseAdmin = getAdmin();
+  const { data, error } = await supabaseAdmin.auth.admin.listUsers({
+    page: 1,
+    perPage: 1000,
+  });
+  if (error) {
+    throw new Error(`Gagal mencari akun auth existing: ${error.message}`);
+  }
+  return data.users.find((user) => user.email?.toLowerCase() === email.toLowerCase()) ?? null;
+}
+
+async function ensureWalletAuthUser(email: string, password: string, walletAddress: string) {
+  const supabaseAdmin = getAdmin();
+  const existingAuthUser = await findAuthUserByEmail(email);
+  if (existingAuthUser) {
+    const { data, error } = await supabaseAdmin.auth.admin.updateUserById(existingAuthUser.id, {
+      password,
+      email_confirm: true,
+      user_metadata: {
+        ...(existingAuthUser.user_metadata || {}),
+        wallet_address: walletAddress,
+      },
+    });
+    if (error || !data.user) {
+      throw new Error(`Gagal memulihkan akun auth existing: ${error?.message || "user tidak tersedia"}`);
+    }
+    return { user: data.user, created: false };
+  }
+
+  const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { wallet_address: walletAddress },
+  });
+  if (error || !data.user) {
+    throw new Error(`Gagal membuat akun auth baru: ${error?.message || "user tidak tersedia"}`);
+  }
+  return { user: data.user, created: true };
+}
+
 async function writeProfileOrThrow(
   operation: Promise<{ error: { message?: string } | null }>,
   context: string,
@@ -50,131 +89,36 @@ async function writeProfileOrThrow(
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { walletAddress, message, signature, fullName, email: bodyEmail, phone, nik } = body;
-
-    if (!walletAddress || !message || !signature) {
+    const { walletAddress, fullName, email: bodyEmail, phone, nik, role: bodyRole } = body;
+    if (!walletAddress)
       return NextResponse.json(
-        { error: "walletAddress, message, dan signature wajib diisi." },
+        { error: "walletAddress required" },
         { status: 400 },
       );
-    }
-
-    // Fatal 5: Validate message prefix
-    if (!message.startsWith("SSDP Login\n")) {
-      return NextResponse.json({ error: "Format pesan login tidak valid." }, { status: 400 });
-    }
-
-    // Fatal 2: Initialize these BEFORE any usage
     const addr = walletAddress.toLowerCase();
+    const syntheticEmail = `${addr.slice(2)}@wallet.local`;
+    const syntheticPassword = `${addr}-ssdp-wallet-login`;
     const supabaseAdmin = getAdmin();
     const supabaseAuth = getAuthClient();
-
-    // Verify wallet signature (try-catch for malformed hex)
-    let valid = false;
-    try {
-      valid = await verifyMessage({
-        address: addr as `0x${string}`,
-        message,
-        signature: signature as `0x${string}`,
-      });
-    } catch {
-      valid = false;
-    }
-    if (!valid) {
-      return NextResponse.json(
-        { error: "Signature wallet tidak valid." },
-        { status: 401 },
-      );
-    }
-
-    const nonceMatch = message.match(/Nonce: ([a-f0-9]+)/);
-    const timestampMatch = message.match(/Timestamp: (.+)/);
-    const walletMatch = message.match(/Wallet: (0x[0-9a-fA-F]+)/);
-
-    if (!nonceMatch || !timestampMatch || !walletMatch) {
-      return NextResponse.json({ error: "Format pesan signature tidak valid." }, { status: 400 });
-    }
-    if (walletMatch[1].toLowerCase() !== addr) {
-      return NextResponse.json({ error: "Wallet address di signature tidak cocok." }, { status: 400 });
-    }
-
-    const nonce = nonceMatch[1];
-    
-    // Validate nonce from auth_nonces table
-    const { data: nonceRow } = await supabaseAdmin
-      .from("auth_nonces")
-      .select("nonce, message, expires_at")
-      .eq("wallet_address", addr)
-      .maybeSingle();
-
-    if (!nonceRow || nonceRow.nonce !== nonce || nonceRow.message !== message) {
-      return NextResponse.json({ error: "Nonce tidak valid atau sudah dipakai." }, { status: 401 });
-    }
-
-    if (new Date(nonceRow.expires_at).getTime() < Date.now()) {
-      return NextResponse.json({ error: "Nonce sudah kedaluwarsa." }, { status: 401 });
-    }
-
-    // Delete nonce (single-use)
-    await supabaseAdmin.from("auth_nonces").delete().eq("wallet_address", addr);
-
-    const syntheticEmail = `${addr.slice(2)}@wallet.local`;
     let { data: existing } = (await supabaseAdmin
       .from("profil")
       .select("*")
       .eq("wallet_address", addr)
       .maybeSingle()) as { data: any | null };
-
+    if (existing) existing = { ...existing, role: normalizeRole(addr, existing.role) };
     let userId: string;
     let role: string;
-    const sessionPassword = generateSessionPassword();
-    let signInResult;
-    if (existing?.id) {
-      // Fatal 1: Update password of existing user before sign-in
-      await supabaseAdmin.auth.admin.updateUserById(existing.id, {
-        password: sessionPassword,
-        user_metadata: { wallet_address: addr },
-      });
-      signInResult = await supabaseAuth.auth.signInWithPassword({
-        email: syntheticEmail,
-        password: sessionPassword,
-      });
-      userId = existing.id;
-      role = MASTER_WALLETS.includes(addr)
-        ? "admin"
-        : existing.role ?? "participant";
-      const profilePayload: any = {
-        id: userId,
-        wallet_address: addr,
-        role,
-      };
-      if (fullName) profilePayload.full_name = fullName;
-      if (bodyEmail) profilePayload.email = bodyEmail;
-      if (phone) profilePayload.phone = phone;
-      if (nik) profilePayload.nik = nik;
-      await writeProfileOrThrow(
-        (supabaseAdmin.from("profil") as any).upsert(profilePayload, { onConflict: "id" }),
-        "Gagal upsert profil pengguna existing",
-      );
-      existing = { ...existing, ...profilePayload };
-    } else {
-      const { data: newUser, error: createErr } =
-        await supabaseAdmin.auth.admin.createUser({
-          email: syntheticEmail,
-          password: sessionPassword,
-          email_confirm: true,
-          user_metadata: { wallet_address: addr },
-        });
-      if (createErr || !newUser?.user)
-        return NextResponse.json(
-          { error: "Gagal membuat akun: " + createErr?.message },
-          { status: 500 },
-        );
+    let signInResult = await supabaseAuth.auth.signInWithPassword({
+      email: syntheticEmail,
+      password: syntheticPassword,
+    });
 
-      userId = newUser.user.id;
-      role = MASTER_WALLETS.includes(addr)
+    if (signInResult.data.session?.access_token && signInResult.data.user) {
+      userId = signInResult.data.user.id;
+      role = addr === MASTER_WALLET
         ? "admin"
-        : existing?.role ?? "participant";
+        : existing?.role ?? bodyRole ?? "participant";
+
       const profilePayload: any = {
         id: userId,
         wallet_address: addr,
@@ -189,19 +133,67 @@ export async function POST(req: NextRequest) {
         (supabaseAdmin.from("profil") as any).upsert(profilePayload, {
           onConflict: "id",
         }),
-        "Gagal upsert profil pengguna baru",
+        "Gagal upsert profil pengguna existing",
+      );
+      existing = { ...existing, ...profilePayload };
+    } else {
+      const { user: ensuredAuthUser, created: isCreated } = await ensureWalletAuthUser(
+        syntheticEmail,
+        syntheticPassword,
+        addr,
+      );
+
+      userId = ensuredAuthUser.id;
+      role = addr === MASTER_WALLET
+        ? "admin"
+        : bodyRole ?? existing?.role ?? "participant";
+      const profilePayload: any = {
+        id: userId,
+        wallet_address: addr,
+        role,
+      };
+      if (fullName) profilePayload.full_name = fullName;
+      if (bodyEmail) profilePayload.email = bodyEmail;
+      if (phone) profilePayload.phone = phone;
+      if (nik) profilePayload.nik = nik;
+
+      await writeProfileOrThrow(
+        (supabaseAdmin.from("profil") as any).upsert(profilePayload, {
+          onConflict: "id",
+        }),
+        isCreated ? "Gagal upsert profil pengguna baru" : "Gagal upsert profil pengguna existing dari auth recovery",
       );
       existing = { ...existing, ...profilePayload };
 
+      if (isCreated && role === "assessor") {
+        const { data: adminProfile } = await supabaseAdmin
+          .from("profil")
+          .select("id")
+          .eq("role", "admin")
+          .maybeSingle();
+
+        if (adminProfile?.id) {
+          await supabaseAdmin.from("log_aktivitas").insert({
+            actor_id: adminProfile.id,
+            actor_role: "admin",
+            activity_type: "tambah_asesor",
+            activity_detail: `Admin mendaftarkan akun Asesor baru: ${fullName || "Asesor"} dengan wallet ${addr}`,
+            reference_table: "profil",
+            reference_id: userId,
+          });
+        }
+      }
+
       signInResult = await supabaseAuth.auth.signInWithPassword({
         email: syntheticEmail,
-        password: sessionPassword,
+        password: syntheticPassword,
       });
     }
 
-    if (fullName || bodyEmail || phone || nik || MASTER_WALLETS.includes(addr)) {
+    if (bodyRole || fullName || bodyEmail || phone || nik || addr === MASTER_WALLET) {
       const updatePayload: any = {};
-      if (MASTER_WALLETS.includes(addr)) updatePayload.role = "admin";
+      if (addr === MASTER_WALLET) updatePayload.role = "admin";
+      else if (bodyRole) updatePayload.role = bodyRole;
       if (fullName) updatePayload.full_name = fullName;
       if (bodyEmail) updatePayload.email = bodyEmail;
       if (phone) updatePayload.phone = phone;
@@ -224,7 +216,7 @@ export async function POST(req: NextRequest) {
       );
     }
     const accessToken = signInResult.data.session.access_token;
-    const isNewUser = !MASTER_WALLETS.includes(addr) && !existing?.full_name;
+    const isNewUser = addr !== MASTER_WALLET && !existing?.full_name;
     return NextResponse.json({
       success: true,
       isNewUser,
@@ -238,3 +230,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
+

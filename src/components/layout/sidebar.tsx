@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-
+// Per-role accent config
 const ROLE_THEME = {
   admin: {
     accent: "bg-blue-600",
@@ -105,9 +105,11 @@ export function Sidebar() {
     startTransition(() => { setIsHydrated(true); });
   }, []);
 
-  
+  // Derive resolved name from auth/cache, fallback to DB fetch
   useEffect(() => {
     if (!isHydrated) return;
+    startTransition(() => { setResolvedName(null); });
+
     const fromAuth = effectiveUser?.full_name;
     if (fromAuth) {
       startTransition(() => { setResolvedName(fromAuth); });
@@ -124,7 +126,7 @@ export function Sidebar() {
         if (data?.full_name) startTransition(() => { setResolvedName(data.full_name); });
         else if (data?.email) startTransition(() => { setResolvedName(data.email.split("@")[0]); });
       });
-  }, [effectiveUser?.wallet_address, effectiveUser?.full_name, isHydrated]);
+  }, [effectiveUser?.wallet_address, effectiveUser?.full_name, effectiveUser?.email, effectiveRole, isHydrated]);
 
   useEffect(() => {
     if (!isHydrated || !effectiveUser || effectiveRole !== "participant" || typeof window === "undefined") return;
@@ -187,7 +189,10 @@ export function Sidebar() {
     effectiveUser?.email?.split("@")[0] ||
     null;
 
-  const avatarLetter = displayName?.charAt(0)?.toUpperCase() || "?";
+  const avatarLetter =
+    displayName?.charAt(0)?.toUpperCase() ||
+    ROLE_LABEL[effectiveRole || ""]?.charAt(0)?.toUpperCase() ||
+    "U";
 
   const shortWallet = (w?: string | null) =>
     w ? `${w.slice(0, 6)}...${w.slice(-4)}` : null;

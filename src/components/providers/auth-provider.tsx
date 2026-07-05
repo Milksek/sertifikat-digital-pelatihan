@@ -85,8 +85,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const cachedProfileRef = React.useRef(user);
   const account = useActiveAccount();
   const activeWallet = useActiveWallet();
+  const activeWalletAddress = account?.address?.toLowerCase() ?? null;
   const { disconnect } = useDisconnect();
   const router = useRouter();
+  useEffect(() => {
+    cachedProfileRef.current = user;
+  }, [user]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!activeWalletAddress) return;
+
+    let cachedProfile: UserProfile | null = null;
+    try {
+      const raw = localStorage.getItem("ssdp_profile");
+      cachedProfile = raw ? normalizeProfile(JSON.parse(raw)) : null;
+    } catch {
+      cachedProfile = null;
+    }
+
+    if (cachedProfile?.wallet_address && cachedProfile.wallet_address.toLowerCase() !== activeWalletAddress) {
+      localStorage.removeItem("ssdp_token");
+      localStorage.removeItem("ssdp_profile");
+      localStorage.removeItem("ssdp_role");
+      setUser(null);
+      setRole(null);
+      setIsLoading(false);
+      window.dispatchEvent(new Event("ssdp_auth_change"));
+    }
+  }, [activeWalletAddress]);
+
   useEffect(() => {
     let mounted = true;
     const loadProfile = async (profile: UserProfile | null) => {
@@ -145,7 +173,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               .maybeSingle();
 
             if (data && !error) {
-              loadProfile(data as UserProfile);
+              const normalizedData = normalizeProfile(data as UserProfile);
+              if (
+                activeWalletAddress &&
+                normalizedData?.wallet_address &&
+                normalizedData.wallet_address.toLowerCase() !== activeWalletAddress
+              ) {
+                loadProfile(null);
+                return;
+              }
+              loadProfile(normalizedData);
               return;
             }
             if (cachedProfile) {
@@ -162,6 +199,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
       if (cachedProfile) {
+        if (
+          activeWalletAddress &&
+          cachedProfile.wallet_address &&
+          cachedProfile.wallet_address.toLowerCase() !== activeWalletAddress
+        ) {
+          loadProfile(null);
+          return;
+        }
         setIsLoading(false);
         return;
       }
@@ -207,7 +252,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener("ssdp_auth_change", handleAuthChange);
       window.removeEventListener("storage", handleStorage);
     };
-  }, []);
+  }, [activeWalletAddress]);
   const logout = () => {
     try {
       if (activeWallet) disconnect(activeWallet);
