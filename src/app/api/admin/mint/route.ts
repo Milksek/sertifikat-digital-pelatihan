@@ -19,7 +19,6 @@ import {
   TRAINING_NAME,
 } from "@/lib/app-config";
 import { buildCertificateNumber } from "@/lib/certificate-number";
-import { renderCertificatePng } from "@/lib/cert-png-renderer";
 import { requireAdminUser, getAdminClient } from "@/lib/server-auth";
 
 export const runtime = "nodejs";
@@ -68,6 +67,32 @@ function normalizePrivateKey(value: string) {
 function toIpfsGateway(uri: string | null) {
   if (!uri) return null;
   return uri.startsWith("ipfs://") ? `https://ipfs.io/ipfs/${uri.slice(7)}` : uri;
+}
+
+async function renderCertificateImage(origin: string, payload: {
+  participantName: string;
+  certificateNumber: string;
+  trainingName: string;
+  trainingField: string;
+  issuedAt: string;
+  walletAddress: string;
+}) {
+  const params = new URLSearchParams({
+    participantName: payload.participantName,
+    certificateNumber: payload.certificateNumber,
+    trainingName: payload.trainingName,
+    trainingField: payload.trainingField,
+    issuedAt: payload.issuedAt,
+    walletAddress: payload.walletAddress,
+  });
+  const response = await fetch(`${origin}/api/admin/render-certificate?${params.toString()}`, {
+    method: "GET",
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error("Gagal merender gambar sertifikat final.");
+  }
+  return Buffer.from(await response.arrayBuffer());
 }
 
 async function uploadJsonToPinata(fileName: string, payload: object) {
@@ -173,14 +198,13 @@ export async function POST(req: NextRequest) {
 
     const certificateNumber = existingCertificate.data?.certificate_number || buildCertificateNumber(assessment.id);
     const issuedAt = new Date().toISOString();
-    const certificateImage = await renderCertificatePng({
+    const certificateImage = await renderCertificateImage(req.nextUrl.origin, {
       participantName: assessment.participant?.full_name || "Peserta",
       certificateNumber,
       trainingName: TRAINING_NAME,
       trainingField: TRAINING_FIELD,
       issuedAt,
       walletAddress: assessment.participant!.wallet_address,
-      verifyUrl: `${req.nextUrl.origin}/verify?q=${certificateNumber}`,
     });
     const imageUpload = await uploadImageToPinata(`${certificateNumber}.png`, certificateImage);
     const metadataPayload = {
