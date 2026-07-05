@@ -25,7 +25,7 @@ function readTemplateDataUri() {
       const bytes = readFileSync(filePath);
       cachedTemplateDataUri = `data:image/png;base64,${bytes.toString("base64")}`;
       return cachedTemplateDataUri;
-    } catch {}
+    } catch { }
   }
   throw new Error("Template sertifikat tidak ditemukan.");
 }
@@ -66,23 +66,23 @@ export function CertificateRenderTemplate({ data, size = 1200 }: { data: Certifi
   return (
     <div style={{ position: "relative", width: size, height: size, display: "flex", backgroundColor: "#0f172a" }}>
       <img src={background} alt="Template Sertifikat" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }} />
-      <div style={{ position: "absolute", top: "3.1%", left: "26%", right: "18%", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", color: "rgba(255,255,255,0.72)", fontFamily: "Arial, Helvetica, sans-serif" }}>
-        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 4 }}>NOMOR SERTIFIKAT</div>
-        <div style={{ marginTop: 4, fontSize: 18, fontWeight: 700, color: "#ffffff", fontFamily: "monospace" }}>{certNo}</div>
+      <div style={{ position: "absolute", top: "2%", left: "5%", right: "35%", display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left", color: "rgba(255,255,255,0.72)", fontFamily: "Arial, Helvetica, sans-serif" }}>
+        <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: 4 }}>NOMOR SERTIFIKAT</div>
+        <div style={{ marginTop: 6, fontSize: 24, fontWeight: 900, color: "#ffffff", fontFamily: "monospace" }}>{certNo}</div>
       </div>
-      <div style={{ position: "absolute", top: "43.8%", left: "41.5%", right: "13%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", color: "#ffffff", fontFamily: "Arial, Helvetica, sans-serif", lineHeight: 1.02 }}>
+      <div style={{ position: "absolute", top: "48%", left: "33%", right: "13%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", color: "#ffffff", fontFamily: "Arial, Helvetica, sans-serif", lineHeight: 1.02 }}>
         <div style={{ fontSize: 49, fontWeight: 700 }}>{nameLines[0]}</div>
         {nameLines[1] ? <div style={{ marginTop: 3, fontSize: 49, fontWeight: 700 }}>{nameLines[1]}</div> : null}
       </div>
-      <div style={{ position: "absolute", top: "64.6%", left: "49%", right: "13%", display: "flex", justifyContent: "center", textAlign: "center", color: "rgba(255,255,255,0.82)", fontFamily: "Arial, Helvetica, sans-serif", fontSize: 14 }}>{data.trainingField}</div>
-      <div style={{ position: "absolute", top: "68.5%", left: "39%", right: "13%", display: "flex", justifyContent: "center", textAlign: "center", color: "#ffffff", fontFamily: "Arial, Helvetica, sans-serif", fontSize: 28, fontWeight: 700 }}>{data.trainingName}</div>
-      <div style={{ position: "absolute", bottom: "17.2%", left: "45%", width: "16%", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", color: "#ffffff", fontFamily: "Arial, Helvetica, sans-serif" }}>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: "rgba(255,255,255,0.62)", textTransform: "uppercase" }}>Tanggal Terbit</div>
-        <div style={{ marginTop: 4, fontSize: 13, fontWeight: 700 }}>{dateText}</div>
+      <div style={{ position: "absolute", top: "66.2%", left: "51%", right: "13%", display: "flex", justifyContent: "center", textAlign: "center", color: "rgba(255,255,255,0.82)", fontFamily: "Arial, Helvetica, sans-serif", fontSize: 20 }}>{data.trainingField}</div>
+      <div style={{ position: "absolute", top: "70.5%", left: "28%", right: "13%", display: "flex", justifyContent: "center", textAlign: "center", color: "#ffffff", fontFamily: "Arial, Helvetica, sans-serif", fontSize: 28, fontWeight: 700 }}>{data.trainingName}</div>
+      <div style={{ position: "absolute", bottom: "20%", left: "45%", width: "16%", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", color: "#ffffff", fontFamily: "Arial, Helvetica, sans-serif" }}>
+        <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: 2, color: "rgba(255,255,255,0.62)", textTransform: "uppercase" }}>Tanggal Terbit</div>
+        <div style={{ marginTop: 4, fontSize: 20, fontWeight: 700 }}>{dateText}</div>
       </div>
-      <div style={{ position: "absolute", bottom: "17.2%", left: "61.8%", width: "16%", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", color: "#ffffff", fontFamily: "Arial, Helvetica, sans-serif" }}>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: "rgba(255,255,255,0.62)", textTransform: "uppercase" }}>Wallet Peserta</div>
-        <div style={{ marginTop: 4, fontSize: 13, fontWeight: 700, fontFamily: "monospace" }}>{walletText}</div>
+      <div style={{ position: "absolute", bottom: "20%", left: "65%", width: "16%", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", color: "#ffffff", fontFamily: "Arial, Helvetica, sans-serif" }}>
+        <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: 2, color: "rgba(255,255,255,0.62)", textTransform: "uppercase" }}>Wallet Peserta</div>
+        <div style={{ marginTop: 4, fontSize: 20, fontWeight: 700, fontFamily: "monospace" }}>{walletText}</div>
       </div>
     </div>
   );

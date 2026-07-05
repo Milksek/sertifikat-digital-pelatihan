@@ -24,6 +24,7 @@ export default function AdminMintPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<{ name: string; certNo: string; date: string; wallet: string; training: string; field: string } | null>(null);
   const [previewName, setPreviewName] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
 
   const loadItems = async () => {
@@ -60,22 +61,33 @@ export default function AdminMintPage() {
 
   const handlePreview = (assessmentId: string, participantName: string) => {
     const wallet = items.find(i => i.id === assessmentId)?.participant?.wallet_address || "0x0000000000000000000000000000000000000000";
-    setPreviewData({
+    const data = {
       name: participantName,
       certNo: `SSDP-JWD-${assessmentId.slice(0, 8).toUpperCase()}`,
       date: new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "long", year: "numeric" }).format(),
       wallet: wallet.length > 15 ? `${wallet.slice(0, 6)}...${wallet.slice(-4)}` : wallet,
       training: TRAINING_NAME,
       field: TRAINING_FIELD,
-    });
-    setPreviewUrl("client");
+    };
+    setPreviewData(data);
     setPreviewName(participantName);
+    setPreviewLoading(true);
+    const params = new URLSearchParams({
+      participantName: participantName,
+      certificateNumber: data.certNo,
+      trainingName: data.training,
+      trainingField: data.field,
+      issuedAt: new Date().toISOString(),
+      walletAddress: wallet,
+    });
+    setPreviewUrl(`/api/admin/render-certificate?${params.toString()}`);
   };
 
   const closePreview = () => {
     setPreviewUrl(null);
     setPreviewData(null);
     setPreviewName(null);
+    setPreviewLoading(false);
   };
 
   return (
@@ -117,39 +129,19 @@ export default function AdminMintPage() {
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-white">Preview Sertifikat - {previewName}</DialogTitle>
           </DialogHeader>
-          <div className="mt-4 flex justify-center items-center rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 p-2">
-            {previewData && (
-              <div className="relative w-[600px] h-[600px]">
+          <div className="mt-4 flex justify-center items-center rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 p-2 min-h-[640px]">
+            {previewUrl ? (
+              <div className="relative w-[600px] h-[600px] flex items-center justify-center">
+                {previewLoading && <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/70 text-sm text-slate-300">Merender preview final...</div>}
                 <img
-                  src="/certificate_template.png"
-                  alt="Template Sertifikat"
-                  className="absolute inset-0 w-full h-full object-contain"
-                  crossOrigin="anonymous"
+                  src={previewUrl}
+                  alt={`Preview Sertifikat ${previewName}`}
+                  className="w-full h-full object-contain rounded-2xl"
+                  onLoad={() => setPreviewLoading(false)}
+                  onError={() => setPreviewLoading(false)}
                 />
-                {/* Text overlays positioned to match Canva template */}
-                <div className="absolute top-[2%] left-[10%] right-[8%] text-text-right">
-                  <p className="text-[9px] font-semibold tracking-[3px] text-white/70 uppercase">NOMOR SERTIFIKAT</p>
-                  <p className="text-sm font-bold text-white mt-1 font-mono">{previewData.certNo}</p>
-                </div>
-                <div className="absolute top-[44%] left-[33%] right-[5%] text-center">
-                  <p className="text-3xl font-extrabold text-white mt-2 leading-tight">{previewData.name}</p>
-                </div>
-                <div className="absolute top-[69%] left-[30%] right-[5%] text-center">
-                  <p className="text-xl font-bold text-white mt-1">{previewData.training}</p>
-                </div>
-                <div className="absolute top-[65%] left-[47.8%] right-[5%] text-center">
-                  <p className="text-sm text-white/80 mt-1">{previewData.field}</p>
-                </div>
-                <div className="absolute bottom-[18%] left-[40%] w-[25%] text-center">
-                  <p className="text-[9px] font-semibold tracking-[2px] text-white/60 uppercase">Tanggal Terbit</p>
-                  <p className="text-xs font-bold text-white mt-1">{previewData.date}</p>
-                </div>
-                <div className="absolute bottom-[18%] left-[61%] w-[25%] text-center">
-                  <p className="text-[9px] font-semibold tracking-[2px] text-white/60 uppercase">Wallet Peserta</p>
-                  <p className="text-xs font-bold text-white mt-1 font-mono">{previewData.wallet}</p>
-                </div>
               </div>
-            )}
+            ) : null}
           </div>
         </DialogContent>
       </Dialog>
