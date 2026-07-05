@@ -1,4 +1,5 @@
 import path from "node:path";
+import { readFileSync } from "node:fs";
 import sharp from "sharp";
 
 type RenderCertificateInput = {
@@ -56,8 +57,12 @@ function splitName(value: string, maxLength = 28) {
 }
 
 export async function renderCertificatePng(input: RenderCertificateInput) {
-  const templatePath = path.join(process.cwd(), "public", "certificate_template.png");
-  const template = sharp(templatePath);
+  const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
+  const templateUrl = `${baseUrl}/certificate_template.png`;
+  const response = await fetch(templateUrl);
+  if (!response.ok) throw new Error("Gagal memuat template sertifikat.");
+  const buffer = Buffer.from(await response.arrayBuffer());
+  const template = sharp(buffer);
   const metadata = await template.metadata();
 
   const width = metadata.width ?? 1600;
