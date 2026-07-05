@@ -1,4 +1,4 @@
-import sharp from "sharp";
+import { Resvg } from "@resvg/resvg-js";
 
 type RenderCertificateInput = {
   participantName: string;
@@ -50,83 +50,68 @@ function splitName(value: string, maxLength = 28) {
 export async function renderCertificatePng(input: RenderCertificateInput) {
   const W = 1600, H = 1200;
   const participantLines = splitName(input.participantName).map(escapeSvg);
+  const has2Lines = participantLines.length > 1;
 
-  // Create background: solid dark color (avoids needing PNG file)
-  const background = await sharp({
-    create: { width: W, height: H, channels: 4, background: { r: 15, g: 23, b: 42, alpha: 1 } },
-  }).png().toBuffer();
+  const svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="40%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+  </defs>
 
-  // SVG text overlay
-  const overlay = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
-    <style>
-      .name { fill: #ffffff; font-size: 77px; font-weight: 700; font-family: sans-serif; }
-      .label { fill: #94a3b8; font-size: 24px; font-weight: 600; font-family: sans-serif; letter-spacing: 2px; }
-      .value { fill: #f1f5f9; font-size: 29px; font-weight: 700; font-family: monospace; }
-      .field { fill: #64748b; font-size: 24px; font-weight: 400; font-family: sans-serif; }
-      .section { fill: #10b981; font-size: 36px; font-weight: 700; font-family: sans-serif; }
-    </style>
+  <rect width="${W}" height="${H}" fill="url(#bg)" rx="24"/>
+  <rect x="0" y="0" width="${W}" height="6" fill="url(#accent)"/>
+  <rect x="0" y="${H - 6}" width="${W}" height="6" fill="url(#accent)"/>
 
-    <!-- Left panel background -->
-    <rect x="40" y="40" width="580" height="1120" fill="#1e293b" rx="16" stroke="#334155" stroke-width="1"/>
+  <rect x="40" y="40" width="580" height="1120" fill="#1e293b" rx="16" stroke="#334155" stroke-width="1"/>
 
-    <!-- Certificate icon text -->
-    <text x="330" y="200" text-anchor="middle" fill="#10b981" font-size="60" font-family="serif">&#127891;</text>
-    <text x="330" y="250" text-anchor="middle" fill="#10b981" font-size="18" font-weight="600" font-family="sans-serif" letter-spacing="4">CERTIFICATE</text>
+  <text x="330" y="200" text-anchor="middle" fill="#10b981" font-size="18" font-weight="600" font-family="sans-serif" letter-spacing="4">CERTIFICATE</text>
 
-    <!-- Nomor Sertifikat -->
-    <text x="330" y="380" text-anchor="middle" class="label">NOMOR SERTIFIKAT</text>
-    <text x="330" y="420" text-anchor="middle" class="value">${escapeSvg(input.certificateNumber)}</text>
+  <text x="330" y="380" text-anchor="middle" fill="#94a3b8" font-size="24" font-weight="600" font-family="sans-serif" letter-spacing="2">NOMOR SERTIFIKAT</text>
+  <text x="330" y="420" text-anchor="middle" fill="#f1f5f9" font-size="29" font-weight="700" font-family="monospace">${escapeSvg(input.certificateNumber)}</text>
 
-    <line x1="140" y1="460" x2="520" y2="460" stroke="#334155" stroke-width="1"/>
+  <line x1="140" y1="460" x2="520" y2="460" stroke="#334155" stroke-width="1"/>
 
-    <!-- Tanggal Terbit -->
-    <text x="330" y="510" text-anchor="middle" class="label">TANGGAL TERBIT</text>
-    <text x="330" y="550" text-anchor="middle" fill="#f1f5f9" font-size="24" font-weight="700" font-family="sans-serif">${escapeSvg(formatIssuedDate(input.issuedAt))}</text>
+  <text x="330" y="510" text-anchor="middle" fill="#94a3b8" font-size="24" font-weight="600" font-family="sans-serif" letter-spacing="2">TANGGAL TERBIT</text>
+  <text x="330" y="550" text-anchor="middle" fill="#f1f5f9" font-size="24" font-weight="700" font-family="sans-serif">${escapeSvg(formatIssuedDate(input.issuedAt))}</text>
 
-    <line x1="140" y1="590" x2="520" y2="590" stroke="#334155" stroke-width="1"/>
+  <line x1="140" y1="590" x2="520" y2="590" stroke="#334155" stroke-width="1"/>
 
-    <!-- Wallet -->
-    <text x="330" y="640" text-anchor="middle" class="label">WALLET PESERTA</text>
-    <text x="330" y="680" text-anchor="middle" class="value">${escapeSvg(shortenWallet(input.walletAddress))}</text>
+  <text x="330" y="640" text-anchor="middle" fill="#94a3b8" font-size="24" font-weight="600" font-family="sans-serif" letter-spacing="2">WALLET PESERTA</text>
+  <text x="330" y="680" text-anchor="middle" fill="#f1f5f9" font-size="24" font-weight="700" font-family="monospace">${escapeSvg(shortenWallet(input.walletAddress))}</text>
 
-    <line x1="140" y1="720" x2="520" y2="720" stroke="#334155" stroke-width="1"/>
+  <line x1="140" y1="720" x2="520" y2="720" stroke="#334155" stroke-width="1"/>
 
-    <!-- Token Type -->
-    <text x="330" y="770" text-anchor="middle" class="label">JENIS TOKEN</text>
-    <text x="330" y="810" text-anchor="middle" fill="#fbbf24" font-size="24" font-weight="700" font-family="sans-serif">Soulbound Token (SBT)</text>
+  <text x="330" y="770" text-anchor="middle" fill="#94a3b8" font-size="24" font-weight="600" font-family="sans-serif" letter-spacing="2">JENIS TOKEN</text>
+  <text x="330" y="810" text-anchor="middle" fill="#fbbf24" font-size="24" font-weight="700" font-family="sans-serif">Soulbound Token (SBT)</text>
 
-    <!-- Vertical divider -->
-    <line x1="660" y1="80" x2="660" y2="1120" stroke="#334155" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="660" y1="80" x2="660" y2="1120" stroke="#334155" stroke-width="1" stroke-dasharray="4,4"/>
 
-    <!-- Right panel - Title -->
-    <text x="1130" y="180" text-anchor="middle" fill="#94a3b8" font-size="22" font-family="sans-serif" letter-spacing="5">DIBERIKAN KEPADA</text>
+  <text x="1130" y="180" text-anchor="middle" fill="#94a3b8" font-size="22" font-family="sans-serif" letter-spacing="5">DIBERIKAN KEPADA</text>
 
-    <!-- Participant Name -->
-    <text x="1130" y="290" text-anchor="middle" class="name">${participantLines[0] ?? "Peserta"}</text>
-    ${participantLines[1] ? `<text x="1130" y="360" text-anchor="middle" class="name">${participantLines[1]}</text>` : ""}
+  <text x="1130" y="${has2Lines ? 270 : 300}" text-anchor="middle" fill="#f1f5f9" font-size="77" font-weight="700" font-family="sans-serif">${participantLines[0] ?? "Peserta"}</text>
+  ${has2Lines ? `<text x="1130" y="350" text-anchor="middle" fill="#f1f5f9" font-size="77" font-weight="700" font-family="sans-serif">${participantLines[1]}</text>` : ""}
 
-    <!-- Accent line -->
-    <rect x="880" y="${participantLines[1] ? 400 : 320}" width="500" height="4" fill="#10b981" rx="2"/>
+  <rect x="880" y="${has2Lines ? 390 : 340}" width="500" height="4" fill="url(#accent)" rx="2"/>
 
-    <!-- Training info -->
-    <text x="1130" y="${participantLines[1] ? 470 : 400}" text-anchor="middle" fill="#94a3b8" font-size="22" font-family="sans-serif" letter-spacing="3">ATAS PENYELESAIAN PELATIHAN</text>
-    <text x="1130" y="${participantLines[1] ? 540 : 470}" text-anchor="middle" class="section">${escapeSvg(input.trainingName)}</text>
-    <text x="1130" y="${participantLines[1] ? 590 : 520}" text-anchor="middle" class="field">Bidang: ${escapeSvg(input.trainingField)}</text>
+  <text x="1130" y="${has2Lines ? 460 : 410}" text-anchor="middle" fill="#94a3b8" font-size="22" font-family="sans-serif" letter-spacing="3">ATAS PENYELESAIAN PELATIHAN</text>
 
-    <!-- Publisher -->
-    <text x="1130" y="1020" text-anchor="middle" fill="#94a3b8" font-size="18" font-family="sans-serif" letter-spacing="2">DITERBITKAN OLEH</text>
-    <text x="1130" y="1060" text-anchor="middle" fill="#f1f5f9" font-size="22" font-weight="700" font-family="sans-serif">Sistem Sertifikat Digital Pelatihan</text>
-    <text x="1130" y="1090" text-anchor="middle" fill="#64748b" font-size="16" font-family="sans-serif">Terverifikasi secara on-chain di Polygon Amoy Testnet</text>
+  <text x="1130" y="${has2Lines ? 530 : 480}" text-anchor="middle" fill="#10b981" font-size="36" font-weight="700" font-family="sans-serif">${escapeSvg(input.trainingName)}</text>
 
-    <!-- Top accent line -->
-    <rect x="0" y="0" width="${W}" height="6" fill="#10b981" rx="0"/>
-    <!-- Bottom accent line -->
-    <rect x="0" y="${H - 6}" width="${W}" height="6" fill="#10b981" rx="0"/>
-  </svg>`;
+  <text x="1130" y="${has2Lines ? 580 : 530}" text-anchor="middle" fill="#64748b" font-size="24" font-family="sans-serif">Bidang: ${escapeSvg(input.trainingField)}</text>
 
-  // Composite SVG text over solid background
-  return sharp(background)
-    .composite([{ input: Buffer.from(overlay), top: 0, left: 0 }])
-    .png()
-    .toBuffer();
+  <text x="1130" y="1020" text-anchor="middle" fill="#94a3b8" font-size="18" font-family="sans-serif" letter-spacing="2">DITERBITKAN OLEH</text>
+  <text x="1130" y="1060" text-anchor="middle" fill="#f1f5f9" font-size="22" font-weight="700" font-family="sans-serif">Sistem Sertifikat Digital Pelatihan</text>
+  <text x="1130" y="1090" text-anchor="middle" fill="#64748b" font-size="16" font-family="sans-serif">Terverifikasi secara on-chain di Polygon Amoy Testnet</text>
+</svg>`;
+
+  const resvg = new Resvg(svg, { fitTo: { mode: "width", value: W } });
+  const pngData = resvg.render();
+  return Buffer.from(pngData.asPng());
 }
