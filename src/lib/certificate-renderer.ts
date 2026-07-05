@@ -1,5 +1,3 @@
-import { Resvg } from "@resvg/resvg-js";
-
 type RenderCertificateInput = {
   participantName: string;
   certificateNumber: string;
@@ -47,12 +45,12 @@ function splitName(value: string, maxLength = 28) {
   return lines.slice(0, 2);
 }
 
-export async function renderCertificatePng(input: RenderCertificateInput) {
+export function renderCertificateSvg(input: RenderCertificateInput): string {
   const W = 1600, H = 1200;
   const participantLines = splitName(input.participantName).map(escapeSvg);
   const has2Lines = participantLines.length > 1;
 
-  const svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
+  return `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#0f172a"/>
@@ -110,8 +108,4 @@ export async function renderCertificatePng(input: RenderCertificateInput) {
   <text x="1130" y="1060" text-anchor="middle" fill="#f1f5f9" font-size="22" font-weight="700" font-family="sans-serif">Sistem Sertifikat Digital Pelatihan</text>
   <text x="1130" y="1090" text-anchor="middle" fill="#64748b" font-size="16" font-family="sans-serif">Terverifikasi secara on-chain di Polygon Amoy Testnet</text>
 </svg>`;
-
-  const resvg = new Resvg(svg, { fitTo: { mode: "width", value: W } });
-  const pngData = resvg.render();
-  return Buffer.from(pngData.asPng());
 }
