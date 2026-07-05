@@ -151,11 +151,4 @@ export function renderCertificateSvg(input: RenderCertificateInput): string {
 </svg>`;
 }
 
-export async function renderCertificatePng(input: RenderCertificateInput): Promise<Buffer> {
-  // Lazy import to avoid Turbopack bundle issues
-  const { Resvg } = await import("@resvg/resvg-js");
-  const svg = renderCertificateSvg(input);
-  const resvg = new Resvg(svg, { fitTo: { mode: "width", value: 1600 } });
-  const pngData = resvg.render();
-  return Buffer.from(pngData.asPng());
-}
+

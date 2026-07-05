@@ -19,7 +19,7 @@ import {
   TRAINING_NAME,
 } from "@/lib/app-config";
 import { buildCertificateNumber } from "@/lib/certificate-number";
-import { renderCertificatePng } from "@/lib/certificate-renderer";
+import { renderCertificateSvg } from "@/lib/certificate-renderer";
 import { requireAdminUser, getAdminClient } from "@/lib/server-auth";
 
 export const runtime = "nodejs";
@@ -173,7 +173,7 @@ export async function POST(req: NextRequest) {
 
     const certificateNumber = existingCertificate.data?.certificate_number || buildCertificateNumber(assessment.id);
     const issuedAt = new Date().toISOString();
-    const certificateImage = await renderCertificatePng({
+    const svgString = renderCertificateSvg({
       participantName: assessment.participant?.full_name || "Peserta",
       certificateNumber,
       trainingName: TRAINING_NAME,
@@ -182,7 +182,7 @@ export async function POST(req: NextRequest) {
       walletAddress: assessment.participant!.wallet_address,
       verifyUrl: `${req.nextUrl.origin}/verify?q=${certificateNumber}`,
     });
-    const imageUpload = await uploadImageToPinata(`${certificateNumber}.png`, certificateImage);
+    const imageUpload = await uploadImageToPinata(`${certificateNumber}.svg`, Buffer.from(svgString));
     const metadataPayload = {
       name: CERTIFICATE_TITLE,
       description: `Sertifikat soulbound untuk pelatihan ${TRAINING_NAME}.`,
