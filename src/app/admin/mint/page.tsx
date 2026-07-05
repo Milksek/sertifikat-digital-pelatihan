@@ -22,8 +22,9 @@ export default function AdminMintPage() {
   const [mintingId, setMintingId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewData, setPreviewData] = useState<{name:string; certNo:string; date:string; wallet:string; training:string; field:string} | null>(null);
   const [previewName, setPreviewName] = useState<string | null>(null);
-  const [loadingPreviewId, setLoadingPreviewId] = useState<string | null>(null);
+
 
   const loadItems = async () => {
     setLoading(true);
@@ -57,38 +58,23 @@ export default function AdminMintPage() {
     }
   };
 
-  const handlePreview = async (assessmentId: string, participantName: string) => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("ssdp_token") : null;
-    if (!token) return setMessage({ type: "error", text: "Sesi admin tidak ditemukan. Login ulang dulu." });
-
-    setLoadingPreviewId(assessmentId);
-    try {
-      const response = await fetch(`/api/admin/preview-certificate?assessmentId=${assessmentId}&t=${Date.now()}`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-      if (!response.ok) {
-        const result = await response.json();
-        throw new Error(result?.error || "Gagal memuat preview gambar.");
-      }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      setPreviewUrl(url);
-      setPreviewName(participantName);
-    } catch (error) {
-      const text = error instanceof Error ? error.message : "Gagal memuat preview gambar.";
-      toast.error(text);
-    } finally {
-      setLoadingPreviewId(null);
-    }
+  const handlePreview = (assessmentId: string, participantName: string) => {
+    const wallet = items.find(i => i.id === assessmentId)?.participant?.wallet_address || "0x0000000000000000000000000000000000000000";
+    setPreviewData({
+      name: participantName,
+      certNo: `SSDP-JWD-${assessmentId.slice(0,8).toUpperCase()}`,
+      date: new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "long", year: "numeric" }).format(),
+      wallet: wallet.length > 15 ? `${wallet.slice(0,6)}...${wallet.slice(-4)}` : wallet,
+      training: TRAINING_NAME,
+      field: TRAINING_FIELD,
+    });
+    setPreviewUrl("client");
+    setPreviewName(participantName);
   };
 
   const closePreview = () => {
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-    }
     setPreviewUrl(null);
+    setPreviewData(null);
     setPreviewName(null);
   };
 
@@ -120,7 +106,7 @@ export default function AdminMintPage() {
             <Table>
               <TableHeader className="bg-slate-50"><TableRow><TableHead>Peserta</TableHead><TableHead>Wallet</TableHead><TableHead>Status</TableHead><TableHead>Catatan</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader>
               <TableBody>
-                {loading ? <TableRow><TableCell colSpan={5} className="py-10 text-center text-slate-500">Memuat data penerbitan...</TableCell></TableRow> : items.length === 0 ? <TableRow><TableCell colSpan={5} className="py-10 text-center text-slate-500">Belum ada penilaian yang siap diterbitkan.</TableCell></TableRow> : items.map((item) => <TableRow key={item.id}><TableCell><p className="font-semibold text-slate-900">{item.participant?.full_name || "Peserta"}</p><p className="text-xs text-slate-400">{new Date(item.created_at).toLocaleString("id-ID")}</p></TableCell><TableCell className="font-mono text-xs text-slate-600">{item.participant?.wallet_address || "-"}</TableCell><TableCell><Badge variant="outline" className={getAssessmentStatusBadgeClass(item.status)}>{getAssessmentStatusLabel(item.status)}</Badge></TableCell><TableCell className="text-sm text-slate-600">{item.recommendation || "Belum ada catatan hasil penilaian"}</TableCell><TableCell>{item.status === "approved" ? <div className="flex items-center gap-2"><Button size="sm" variant="outline" disabled={loadingPreviewId === item.id || mintingId === item.id} onClick={() => handlePreview(item.id, item.participant?.full_name || "Peserta")} className="rounded-xl border-slate-200">{loadingPreviewId === item.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Eye className="mr-1.5 h-3.5 w-3.5" />}Preview</Button><Button size="sm" disabled={!contractReady || mintingId === item.id || loadingPreviewId === item.id} onClick={() => handleMint(item.id)} className="rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-70">{mintingId === item.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Hammer className="mr-1.5 h-3.5 w-3.5" />}{mintingId === item.id ? "Minting..." : "Mint SBT"}</Button></div> : <Button asChild size="sm" variant="outline" className="rounded-xl border-slate-200"><Link href="/verify"><ExternalLink className="mr-1.5 h-3.5 w-3.5" /> Verifikasi</Link></Button>}</TableCell></TableRow>)}
+                {loading ? <TableRow><TableCell colSpan={5} className="py-10 text-center text-slate-500">Memuat data penerbitan...</TableCell></TableRow> : items.length === 0 ? <TableRow><TableCell colSpan={5} className="py-10 text-center text-slate-500">Belum ada penilaian yang siap diterbitkan.</TableCell></TableRow> : items.map((item) => <TableRow key={item.id}><TableCell><p className="font-semibold text-slate-900">{item.participant?.full_name || "Peserta"}</p><p className="text-xs text-slate-400">{new Date(item.created_at).toLocaleString("id-ID")}</p></TableCell><TableCell className="font-mono text-xs text-slate-600">{item.participant?.wallet_address || "-"}</TableCell><TableCell><Badge variant="outline" className={getAssessmentStatusBadgeClass(item.status)}>{getAssessmentStatusLabel(item.status)}</Badge></TableCell><TableCell className="text-sm text-slate-600">{item.recommendation || "Belum ada catatan hasil penilaian"}</TableCell><TableCell>{item.status === "approved" ? <div className="flex items-center gap-2"><Button size="sm" variant="outline" disabled={mintingId === item.id} onClick={() => handlePreview(item.id, item.participant?.full_name || "Peserta")} className="rounded-xl border-slate-200"><Eye className="mr-1.5 h-3.5 w-3.5" />Preview</Button><Button size="sm" disabled={!contractReady || mintingId === item.id} onClick={() => handleMint(item.id)} className="rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-70">{mintingId === item.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Hammer className="mr-1.5 h-3.5 w-3.5" />}{mintingId === item.id ? "Minting..." : "Mint SBT"}</Button></div> : <Button asChild size="sm" variant="outline" className="rounded-xl border-slate-200"><Link href="/verify"><ExternalLink className="mr-1.5 h-3.5 w-3.5" /> Verifikasi</Link></Button>}</TableCell></TableRow>)}
               </TableBody>
             </Table>
           </div>
@@ -132,12 +118,37 @@ export default function AdminMintPage() {
             <DialogTitle className="text-xl font-bold text-white">Preview Sertifikat - {previewName}</DialogTitle>
           </DialogHeader>
           <div className="mt-4 flex justify-center items-center rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 p-2">
-            {previewUrl && (
-              <img
-                src={previewUrl}
-                alt="Preview Sertifikat"
-                className="max-h-[70vh] w-auto object-contain rounded-xl"
-              />
+            {previewData && (
+              <div className="relative w-[600px] h-[600px]">
+                <img
+                  src="/certificate_template.png"
+                  alt="Template Sertifikat"
+                  className="absolute inset-0 w-full h-full object-contain"
+                  crossOrigin="anonymous"
+                />
+                {/* Text overlays positioned to match Canva template */}
+                <div className="absolute top-[10%] left-[8%] right-[42%] text-center">
+                  <p className="text-[10px] font-semibold tracking-[3px] text-white/70 uppercase">NOMOR SERTIFIKAT</p>
+                  <p className="text-sm font-bold text-white mt-1 font-mono">{previewData.certNo}</p>
+                </div>
+                <div className="absolute top-[38%] left-[35%] right-[5%] text-center">
+                  <p className="text-[10px] font-semibold tracking-[3px] text-white/70 uppercase">Diberikan Kepada</p>
+                  <p className="text-3xl font-extrabold text-white mt-2 leading-tight">{previewData.name}</p>
+                </div>
+                <div className="absolute top-[55%] left-[35%] right-[5%] text-center">
+                  <p className="text-sm font-bold text-white">Atas Penyelesaian Pelatihan</p>
+                  <p className="text-xl font-bold text-white mt-1">{previewData.training}</p>
+                  <p className="text-sm text-white/60 mt-1">Bidang: {previewData.field}</p>
+                </div>
+                <div className="absolute bottom-[15%] left-[5%] right-[55%] text-center">
+                  <p className="text-[9px] font-semibold tracking-[2px] text-white/60 uppercase">Tanggal Terbit</p>
+                  <p className="text-xs font-bold text-white mt-1">{previewData.date}</p>
+                </div>
+                <div className="absolute bottom-[15%] left-[45%] right-[5%] text-center">
+                  <p className="text-[9px] font-semibold tracking-[2px] text-white/60 uppercase">Wallet Peserta</p>
+                  <p className="text-xs font-bold text-white mt-1 font-mono">{previewData.wallet}</p>
+                </div>
+              </div>
             )}
           </div>
         </DialogContent>
