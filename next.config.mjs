@@ -3,7 +3,7 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  serverExternalPackages: ["sharp"],
+  serverExternalPackages: ["sharp", "@resvg/resvg-js"],
   outputFileTracingIncludes: {
     "/api/admin/preview-certificate/**": ["public/certificate_template.png"],
     "/api/admin/mint/**": ["public/certificate_template.png"],
