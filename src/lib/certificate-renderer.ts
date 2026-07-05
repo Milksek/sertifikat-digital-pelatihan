@@ -1,3 +1,7 @@
+import path from "node:path";
+import { readFileSync } from "node:fs";
+import sharp from "sharp";
+
 type RenderCertificateInput = {
   participantName: string;
   certificateNumber: string;
@@ -8,7 +12,7 @@ type RenderCertificateInput = {
   verifyUrl?: string;
 };
 
-function escapeSvg(value: string) {
+function escapeSvgText(value: string) {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -45,9 +49,21 @@ function splitName(value: string, maxLength = 28) {
   return lines.slice(0, 2);
 }
 
+function findTemplate(): Buffer {
+  const candidates = [
+    path.join(process.cwd(), "src", "app", "api", "admin", "preview-certificate", "certificate_template.png"),
+    path.join(process.cwd(), "src", "app", "api", "admin", "mint", "certificate_template.png"),
+    path.join(process.cwd(), "public", "certificate_template.png"),
+  ];
+  for (const p of candidates) {
+    try { return readFileSync(p); } catch {}
+  }
+  throw new Error("Template sertifikat tidak ditemukan di server.");
+}
+
 export function renderCertificateSvg(input: RenderCertificateInput): string {
   const W = 1600, H = 1200;
-  const participantLines = splitName(input.participantName).map(escapeSvg);
+  const participantLines = splitName(input.participantName).map(escapeSvgText);
   const has2Lines = participantLines.length > 1;
 
   return `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
@@ -72,17 +88,17 @@ export function renderCertificateSvg(input: RenderCertificateInput): string {
   <text x="330" y="200" text-anchor="middle" fill="#10b981" font-size="18" font-weight="600" font-family="sans-serif" letter-spacing="4">CERTIFICATE</text>
 
   <text x="330" y="380" text-anchor="middle" fill="#94a3b8" font-size="24" font-weight="600" font-family="sans-serif" letter-spacing="2">NOMOR SERTIFIKAT</text>
-  <text x="330" y="420" text-anchor="middle" fill="#f1f5f9" font-size="29" font-weight="700" font-family="monospace">${escapeSvg(input.certificateNumber)}</text>
+  <text x="330" y="420" text-anchor="middle" fill="#f1f5f9" font-size="29" font-weight="700" font-family="monospace">${escapeSvgText(input.certificateNumber)}</text>
 
   <line x1="140" y1="460" x2="520" y2="460" stroke="#334155" stroke-width="1"/>
 
   <text x="330" y="510" text-anchor="middle" fill="#94a3b8" font-size="24" font-weight="600" font-family="sans-serif" letter-spacing="2">TANGGAL TERBIT</text>
-  <text x="330" y="550" text-anchor="middle" fill="#f1f5f9" font-size="24" font-weight="700" font-family="sans-serif">${escapeSvg(formatIssuedDate(input.issuedAt))}</text>
+  <text x="330" y="550" text-anchor="middle" fill="#f1f5f9" font-size="24" font-weight="700" font-family="sans-serif">${escapeSvgText(formatIssuedDate(input.issuedAt))}</text>
 
   <line x1="140" y1="590" x2="520" y2="590" stroke="#334155" stroke-width="1"/>
 
   <text x="330" y="640" text-anchor="middle" fill="#94a3b8" font-size="24" font-weight="600" font-family="sans-serif" letter-spacing="2">WALLET PESERTA</text>
-  <text x="330" y="680" text-anchor="middle" fill="#f1f5f9" font-size="24" font-weight="700" font-family="monospace">${escapeSvg(shortenWallet(input.walletAddress))}</text>
+  <text x="330" y="680" text-anchor="middle" fill="#f1f5f9" font-size="24" font-weight="700" font-family="monospace">${escapeSvgText(shortenWallet(input.walletAddress))}</text>
 
   <line x1="140" y1="720" x2="520" y2="720" stroke="#334155" stroke-width="1"/>
 
@@ -100,9 +116,9 @@ export function renderCertificateSvg(input: RenderCertificateInput): string {
 
   <text x="1130" y="${has2Lines ? 460 : 410}" text-anchor="middle" fill="#94a3b8" font-size="22" font-family="sans-serif" letter-spacing="3">ATAS PENYELESAIAN PELATIHAN</text>
 
-  <text x="1130" y="${has2Lines ? 530 : 480}" text-anchor="middle" fill="#10b981" font-size="36" font-weight="700" font-family="sans-serif">${escapeSvg(input.trainingName)}</text>
+  <text x="1130" y="${has2Lines ? 530 : 480}" text-anchor="middle" fill="#10b981" font-size="36" font-weight="700" font-family="sans-serif">${escapeSvgText(input.trainingName)}</text>
 
-  <text x="1130" y="${has2Lines ? 580 : 530}" text-anchor="middle" fill="#64748b" font-size="24" font-family="sans-serif">Bidang: ${escapeSvg(input.trainingField)}</text>
+  <text x="1130" y="${has2Lines ? 580 : 530}" text-anchor="middle" fill="#64748b" font-size="24" font-family="sans-serif">Bidang: ${escapeSvgText(input.trainingField)}</text>
 
   <text x="1130" y="1020" text-anchor="middle" fill="#94a3b8" font-size="18" font-family="sans-serif" letter-spacing="2">DITERBITKAN OLEH</text>
   <text x="1130" y="1060" text-anchor="middle" fill="#f1f5f9" font-size="22" font-weight="700" font-family="sans-serif">Sistem Sertifikat Digital Pelatihan</text>
@@ -111,9 +127,43 @@ export function renderCertificateSvg(input: RenderCertificateInput): string {
 }
 
 export async function renderCertificatePng(input: RenderCertificateInput): Promise<Buffer> {
-  const { Resvg } = await import("@resvg/resvg-js");
-  const svg = renderCertificateSvg(input);
-  const resvg = new Resvg(svg, { fitTo: { mode: "width", value: 1600 } });
-  const pngData = resvg.render();
-  return Buffer.from(pngData.asPng());
+  const templateBuffer = findTemplate();
+  const template = sharp(templateBuffer);
+  const metadata = await template.metadata();
+
+  const width = metadata.width ?? 1600;
+  const height = metadata.height ?? 1200;
+  const participantLines = splitName(input.participantName);
+  const safeLines = participantLines.map(escapeSvgText);
+
+  const overlay = `
+    <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+      <style>
+        .name { fill: #ffffff; font-size: ${Math.round(width * 0.048)}px; font-weight: 700; font-family: 'Poppins', sans-serif; }
+        .label { fill: #ffffff; font-size: ${Math.round(width * 0.015)}px; font-weight: 600; font-family: 'Poppins', sans-serif; letter-spacing: 1.2px; }
+        .value { fill: #ffffff; font-size: ${Math.round(width * 0.018)}px; font-weight: 700; font-family: 'Poppins', sans-serif; }
+        .field { fill: #ffffff; font-size: ${Math.round(width * 0.015)}px; font-weight: 400; font-family: 'Poppins', sans-serif; }
+      </style>
+
+      <text x="64%" y="52%" text-anchor="middle" class="name">${safeLines[0] ?? "Peserta"}</text>
+      ${safeLines[1] ? `<text x="68%" y="58.8%" text-anchor="middle" class="name">${safeLines[1]}</text>` : ""}
+
+      <text x="54%" y="73%" text-anchor="middle" class="value">${escapeSvgText(input.trainingName)}</text>
+      <text x="68%" y="68%" text-anchor="middle" class="field">${escapeSvgText(input.trainingField)}</text>
+
+      <text x="5%" y="5%" class="label">NOMOR SERTIFIKAT</text>
+      <text x="5%" y="8%" class="value">${escapeSvgText(input.certificateNumber)}</text>
+
+      <text x="45%" y="78%" class="label">TANGGAL TERBIT</text>
+      <text x="45%" y="81%" class="value">${escapeSvgText(formatIssuedDate(input.issuedAt))}</text>
+
+      <text x="65%" y="78%" class="label">WALLET PESERTA</text>
+      <text x="65%" y="81%" class="value">${escapeSvgText(shortenWallet(input.walletAddress))}</text>
+    </svg>
+  `;
+
+  return template
+    .composite([{ input: Buffer.from(overlay), top: 0, left: 0 }])
+    .png()
+    .toBuffer();
 }

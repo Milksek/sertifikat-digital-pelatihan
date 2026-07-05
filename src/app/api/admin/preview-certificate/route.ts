@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { renderCertificateSvg } from "@/lib/certificate-renderer";
+import { renderCertificatePng } from "@/lib/certificate-renderer";
 import { buildCertificateNumber } from "@/lib/certificate-number";
 import { TRAINING_NAME, TRAINING_FIELD } from "@/lib/app-config";
 
@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
     const certificateNumber = existingCert?.certificate_number || buildCertificateNumber(assessment.id);
     const issuedAt = new Date().toISOString();
 
-    const svg = renderCertificateSvg({
+    const imageBuffer = await renderCertificatePng({
       participantName: assessment.participant?.full_name || "Peserta",
       certificateNumber,
       trainingName: TRAINING_NAME,
@@ -94,9 +94,9 @@ export async function GET(req: NextRequest) {
       verifyUrl: `${req.nextUrl.origin}/verify?q=${certificateNumber}`,
     });
 
-    return new Response(svg, {
+    return new Response(imageBuffer, {
       headers: {
-        "Content-Type": "image/svg+xml",
+        "Content-Type": "image/png",
         "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
       },
     });
