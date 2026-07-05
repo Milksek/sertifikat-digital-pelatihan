@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { randomBytes } from "node:crypto";
 
-const NONCE_TTL_MS = 5 * 60 * 1000;
+const NONCE_TTL_MS = 2 * 60 * 1000;
 
 let _supabaseAdmin: ReturnType<typeof createClient> | null = null;
 
