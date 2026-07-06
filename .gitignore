@@ -46,3 +46,4 @@ remove-comments.js
 /cache/
 /supabase/.temp/
 .env*
+*.txt 
