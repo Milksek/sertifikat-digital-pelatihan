@@ -222,7 +222,15 @@ export async function POST(req: NextRequest) {
       walletAddress: assessment.participant!.wallet_address,
       verifyUrl: `${req.nextUrl.origin}/verify?q=${certificateNumber}`,
     });
+    if (!certificateImage || certificateImage.length === 0) {
+      throw new Error(`Gagal membuat gambar sertifikat PNG untuk ${certificateNumber}.`);
+    }
+
     const imageUpload = await uploadImageToPinata(`${certificateNumber}.png`, certificateImage);
+    if (!imageUpload.ipfsUri || !imageUpload.gatewayUrl) {
+      throw new Error(`Upload PNG ke Pinata gagal untuk ${certificateNumber}.`);
+    }
+
     const metadataPayload = {
       name: CERTIFICATE_TITLE,
       description: `Sertifikat soulbound untuk pelatihan ${TRAINING_NAME}.`,
@@ -238,8 +246,14 @@ export async function POST(req: NextRequest) {
         { trait_type: "Status Penilaian", value: assessment.status },
       ],
     };
+    if (!metadataPayload.image) {
+      throw new Error(`Metadata JSON tidak memiliki field image untuk ${certificateNumber}.`);
+    }
 
     const upload = await uploadJsonToPinata(`${certificateNumber}.json`, metadataPayload);
+    if (!upload.ipfsUri || !upload.gatewayUrl) {
+      throw new Error(`Upload metadata JSON ke Pinata gagal untuk ${certificateNumber}.`);
+    }
 
     const account = privateKeyToAccount(normalizePrivateKey(DEPLOYER_PRIVATE_KEY));
     const publicClient = createPublicClient({ chain: polygonAmoy, transport: http(RPC_URL) });
@@ -275,6 +289,13 @@ export async function POST(req: NextRequest) {
     const totalFeeMatic = formatEther(totalFeeWei);
     const totalFeeIdr = Number(totalFeeMatic) * 10000;
     const mintedAt = issuedAt;
+
+    if (!imageUpload.ipfsUri) {
+      throw new Error(`ipfs_image_uri kosong untuk ${certificateNumber}.`);
+    }
+    if (!upload.ipfsUri) {
+      throw new Error(`metadata_uri kosong untuk ${certificateNumber}.`);
+    }
 
     const certPayload = {
       assessment_id: assessment.id,
