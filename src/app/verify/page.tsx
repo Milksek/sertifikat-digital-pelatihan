@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CertificatePreview } from "@/components/certificate-preview";
 import { APP_NAME, TRAINING_FIELD, TRAINING_NAME } from "@/lib/app-config";
 import {
   Award, ExternalLink, Search, ShieldCheck, ShieldQuestion, ShieldX, Wifi, WifiOff, FileCheck2,
@@ -264,17 +265,34 @@ export default function VerifyPage() {
                   </div>
                 </div>
 
-                {result.ipfs_image_uri && (
-                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 mb-4">Preview Sertifikat</p>
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <p className="mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Preview Sertifikat</p>
+                  {result.ipfs_image_uri ? (
                     <img
                       src={result.ipfs_image_uri.startsWith("ipfs://") ? `https://ipfs.io/ipfs/${result.ipfs_image_uri.replace("ipfs://", "")}` : result.ipfs_image_uri}
                       alt={`Sertifikat ${result.participant_name || result.certificate_number}`}
                       className="w-full rounded-2xl border border-slate-100"
                       loading="lazy"
+                      onError={(event) => {
+                        event.currentTarget.style.display = "none";
+                        const fallback = event.currentTarget.nextElementSibling as HTMLElement | null;
+                        if (fallback) fallback.style.display = "block";
+                      }}
+                    />
+                  ) : null}
+                  <div style={{ display: result.ipfs_image_uri ? "none" : "block" }}>
+                    <CertificatePreview
+                      input={{
+                        participantName: result.participant_name || "Peserta",
+                        certificateNumber: result.certificate_number,
+                        trainingName: result.training_name || TRAINING_NAME,
+                        trainingField: result.training_field || TRAINING_FIELD,
+                        issuedAt: result.minted_at || new Date().toISOString(),
+                        walletAddress: result.participant_wallet,
+                      }}
                     />
                   </div>
-                )}
+                </div>
 
                 <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                   <div className="grid gap-4 md:grid-cols-2">
