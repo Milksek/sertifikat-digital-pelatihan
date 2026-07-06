@@ -50,10 +50,13 @@ export async function GET(req: NextRequest) {
       `Waktu: ${issuedAt}`,
     ].join("\n");
 
+    const now = new Date().toISOString();
     const { error } = await (supabase.from("auth_nonces") as any).insert({
       wallet_address: addr,
       nonce,
       message,
+      nonce_timestamp: now,
+      created_at: now,
       expires_at: expiresAt,
       used_at: null,
     });
