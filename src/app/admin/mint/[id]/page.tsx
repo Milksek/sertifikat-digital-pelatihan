@@ -27,7 +27,7 @@ export default function AdminMintDetailPage() {
       .select(`id,participant_id,status,recommendation,score,participant:profil!participant_id(full_name,wallet_address)`)
       .eq("id", params.id)
       .maybeSingle()
-      .then(({ data }) => setAssessment((data as AssessmentDetail) || null));
+      .then(({ data }) => setAssessment((data as unknown as AssessmentDetail) || null));
   }, [params?.id]);
 
   const metadataPreview = useMemo(() => ({

@@ -28,7 +28,7 @@ export default function AdminMintPage() {
   const loadItems = async () => {
     setLoading(true);
     const { data } = await supabase.from("penilaian").select(`id,status,recommendation,created_at,participant:profil!participant_id(full_name,wallet_address)`).in("status", ["approved", "certified"]).order("created_at", { ascending: false });
-    setItems((data as AssessmentRow[]) || []);
+    setItems((data as unknown as AssessmentRow[]) || []);
     setLoading(false);
   };
 

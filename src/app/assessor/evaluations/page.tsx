@@ -22,7 +22,7 @@ export default function AssessorEvaluationsPage() {
     if (!user?.id) { setItems([]); setLoading(false); return; }
     setLoading(true);
     const { data } = await supabase.from("penilaian").select(`id,status,created_at,training_name,participant:profil!participant_id(full_name,email)`).eq("assessor_id", user.id).in("status", ["in_progress", "evaluated", "approved", "rejected"]).order("created_at", { ascending: true });
-    setItems((data as Row[]) || []);
+    setItems((data as unknown as Row[]) || []);
     setLoading(false);
   }, [user]);
 

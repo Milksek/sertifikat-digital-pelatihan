@@ -6,7 +6,8 @@ export const hasThirdwebClient = Boolean(clientId);
 
 export const client = hasThirdwebClient
   ? createThirdwebClient({
-      clientId,
+      clientId: clientId!,
+      secretKey: process.env.THIRDWEB_SECRET_KEY,
     })
   : null;
 

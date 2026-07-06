@@ -1,13 +1,13 @@
 ﻿import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-let _supabaseAdmin = null;
+let _supabaseAdmin: ReturnType<typeof createClient> | null = null;
 
 function getAdmin() {
   if (!_supabaseAdmin) {
     _supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
       { auth: { autoRefreshToken: false, persistSession: false } },
     );
   }
@@ -29,9 +29,9 @@ export async function GET() {
 
     return NextResponse.json({ success: true, assessors: data || [] });
   } catch (error) {
-    console.error("[admin/assessors]", error?.message || error);
+    console.error("[admin/assessors]", (error as Error)?.message || error);
     return NextResponse.json(
-      { success: false, error: error?.message || "Gagal memuat asesor" },
+      { success: false, error: (error as Error)?.message || "Gagal memuat asesor" },
       { status: 500 },
     );
   }

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { renderCertificatePng } from "@/lib/certificate-renderer";
+import { buildCertificateNumber } from "@/lib/certificate-number";
+
 import { TRAINING_NAME, TRAINING_FIELD } from "@/lib/app-config";
 
 export const runtime = "nodejs";
@@ -26,11 +28,6 @@ function getAuthedClient(token: string) {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { autoRefreshToken: false, persistSession: false },
   });
-}
-
-function buildCertificateNumber(assessmentId: string) {
-  const cleanId = assessmentId.replace(/-/g, "").slice(0, 12).toUpperCase();
-  return `CERT-JWD-${cleanId}`;
 }
 
 export async function GET(req: NextRequest) {
@@ -78,23 +75,25 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Data penilaian tidak ditemukan." }, { status: 404 });
     }
 
+    const a = assessment as unknown as { id: string; participant?: { full_name?: string | null; wallet_address?: string } | null };
+
     // Resolve certificate number if it already exists or generate a draft number
     const { data: existingCert } = await admin
       .from("sertifikat")
       .select("certificate_number")
-      .eq("assessment_id", assessment.id)
+      .eq("assessment_id", a.id)
       .maybeSingle();
 
-    const certificateNumber = existingCert?.certificate_number || buildCertificateNumber(assessment.id);
+    const certificateNumber = existingCert?.certificate_number || buildCertificateNumber(a.id);
     const issuedAt = new Date().toISOString();
 
     const imageBuffer = await renderCertificatePng({
-      participantName: assessment.participant?.full_name || "Peserta",
+      participantName: a.participant?.full_name || "Peserta",
       certificateNumber,
       trainingName: TRAINING_NAME,
       trainingField: TRAINING_FIELD,
       issuedAt,
-      walletAddress: assessment.participant?.wallet_address || "0x0000000000000000000000000000000000000000",
+      walletAddress: a.participant?.wallet_address || "0x0000000000000000000000000000000000000000",
       verifyUrl: `${req.nextUrl.origin}/verify?q=${certificateNumber}`,
     });
 

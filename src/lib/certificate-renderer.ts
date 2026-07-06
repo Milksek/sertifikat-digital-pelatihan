@@ -8,6 +8,7 @@ type RenderCertificateInput = {
   trainingField: string;
   issuedAt: string;
   walletAddress: string;
+  verifyUrl?: string;
 };
 
 function escapeSvgText(value: string) {

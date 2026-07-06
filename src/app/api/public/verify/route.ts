@@ -113,22 +113,29 @@ async function findCertificateByTokenId(supabase: ReturnType<typeof getAdmin>, t
     return null;
   }
 
+  const d = data as unknown as {
+    certificate_number: string; participant_wallet: string; token_id: string;
+    tx_hash: string; ipfs_image_uri: string; metadata_uri: string; status: string;
+    minted_at: string; revoked_at: string | null; revocation_reason: string | null;
+    assessment?: { recommendation?: string; score?: unknown; participant?: { full_name?: string } } | null;
+  };
+
   return {
-    certificate_number: data.certificate_number,
+    certificate_number: d.certificate_number,
     training_name: TRAINING_NAME,
     training_field: TRAINING_FIELD,
-    participant_wallet: data.participant_wallet,
-    token_id: data.token_id,
-    tx_hash: data.tx_hash,
-    ipfs_image_uri: data.ipfs_image_uri,
-    metadata_uri: data.metadata_uri,
-    status: data.status,
-    minted_at: data.minted_at,
-    revoked_at: data.revoked_at,
-    revocation_reason: data.revocation_reason,
-    participant_name: data.assessment?.participant?.full_name ?? null,
-    recommendation: data.assessment?.recommendation ?? null,
-    score: data.assessment?.score ?? null,
+    participant_wallet: d.participant_wallet,
+    token_id: d.token_id,
+    tx_hash: d.tx_hash,
+    ipfs_image_uri: d.ipfs_image_uri,
+    metadata_uri: d.metadata_uri,
+    status: d.status,
+    minted_at: d.minted_at,
+    revoked_at: d.revoked_at,
+    revocation_reason: d.revocation_reason,
+    participant_name: d.assessment?.participant?.full_name ?? null,
+    recommendation: d.assessment?.recommendation ?? null,
+    score: d.assessment?.score ?? null,
   };
 }
 

@@ -19,6 +19,8 @@ import {
   TRAINING_NAME,
 } from "@/lib/app-config";
 import { renderCertificatePng } from "@/lib/certificate-renderer";
+import { buildCertificateNumber } from "@/lib/certificate-number";
+
 
 export const runtime = "nodejs";
 
@@ -87,11 +89,6 @@ function normalizePrivateKey(value: string) {
 function toIpfsGateway(uri: string | null) {
   if (!uri) return null;
   return uri.startsWith("ipfs://") ? `https://ipfs.io/ipfs/${uri.slice(7)}` : uri;
-}
-
-function buildCertificateNumber(assessmentId: string) {
-  const suffix = assessmentId.replace(/-/g, "").slice(0, 8).toUpperCase();
-  return `SDP-JWD-${suffix}`;
 }
 
 async function uploadJsonToPinata(fileName: string, payload: object) {
@@ -273,7 +270,7 @@ export async function POST(req: NextRequest) {
     const decodedTransfer = decodeEventLog({ abi: [TRANSFER_EVENT], data: transferLog.data, topics: transferLog.topics });
     const tokenId = String(decodedTransfer.args.tokenId);
     const gasUsed = receipt.gasUsed;
-    const effectiveGasPrice = receipt.effectiveGasPrice ?? 0n;
+    const effectiveGasPrice = receipt.effectiveGasPrice ?? BigInt(0);
     const totalFeeWei = gasUsed * effectiveGasPrice;
     const totalFeeMatic = formatEther(totalFeeWei);
     const totalFeeIdr = Number(totalFeeMatic) * 10000;

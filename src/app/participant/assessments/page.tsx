@@ -24,7 +24,7 @@ export default function ParticipantAssessmentsPage() {
       setLoading(true);
       const { data } = await supabase.from("penilaian").select(`id,status,recommendation,created_at,assessor:profil!assessor_id(full_name)`).eq("participant_id", user.id).order("created_at", { ascending: false });
       if (mounted) {
-        setItems((data as Row[]) || []);
+        setItems((data as unknown as Row[]) || []);
         setLoading(false);
       }
     }

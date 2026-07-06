@@ -23,7 +23,7 @@ export default function AssessorCompletedPage() {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    supabase.from("penilaian").select(`id,status,recommendation,training_name,updated_at,participant:profil!participant_id(full_name)`).in("status", ["evaluated", "approved", "rejected", "certified"]).order("updated_at", { ascending: false }).then(({ data }) => { setItems((data as Row[]) || []); setLoading(false); });
+    supabase.from("penilaian").select(`id,status,recommendation,training_name,updated_at,participant:profil!participant_id(full_name)`).in("status", ["evaluated", "approved", "rejected", "certified"]).order("updated_at", { ascending: false }).then(({ data }) => { setItems((data as unknown as Row[]) || []); setLoading(false); });
   }, []);
 
   const filtered = items.filter((i) => !search || i.participant?.full_name?.toLowerCase().includes(search.toLowerCase()));

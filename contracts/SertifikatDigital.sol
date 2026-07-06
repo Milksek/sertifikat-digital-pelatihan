@@ -18,8 +18,8 @@ contract SertifikatDigital is ERC721Base {
 
     function mintCertificate(address recipient, string memory tokenUri) external {
         require(msg.sender == owner(), "Not authorized");
-        require(recipient != address(0), "Invalid recipient");
-        require(bytes(tokenUri).length > 0, "Token URI required");
+        require(recipient != address(0), "Recipient tidak valid");
+        require(bytes(tokenUri).length > 0, "Token URI tidak boleh kosong");
 
         _setTokenURI(nextTokenIdToMint(), tokenUri);
         _safeMint(recipient, 1, "");
@@ -38,11 +38,6 @@ contract SertifikatDigital is ERC721Base {
         if (soulbound && from != address(0) && to != address(0)) {
             revert("Sertifikat ini adalah Kredensial Soulbound dan tidak bisa ditransfer");
         }
-    }
-
-    function setSoulbound(bool _enabled) external {
-        require(msg.sender == owner(), "Not authorized");
-        soulbound = _enabled;
     }
 
     function approve(address, uint256) public virtual override(ERC721A, IERC721) {

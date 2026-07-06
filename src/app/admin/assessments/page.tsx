@@ -54,7 +54,7 @@ export default function AdminAssessmentsPage() {
       supabase.from("penilaian").select(`id,status,recommendation,created_at,training_name,participant:profil!participant_id(full_name,wallet_address),assessor:profil!assessor_id(full_name)`).order("created_at", { ascending: false }),
       supabase.from("profil").select("id,full_name,email").eq("role", "assessor").order("full_name", { ascending: true }),
     ]);
-    setItems((assessmentRes.data as Row[]) || []);
+    setItems((assessmentRes.data as unknown as Row[]) || []);
     setAssessors((assessorRes.data as AssessorOption[]) || []);
     setLoading(false);
   };

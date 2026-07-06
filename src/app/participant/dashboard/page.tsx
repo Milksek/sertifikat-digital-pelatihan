@@ -25,6 +25,7 @@ export default function ParticipantDashboardPage() {
     if (!user) { startTransition(() => { setData({ assessments: [], certificates: [], profile: null }); setLoading(false); }); return; }
     let mounted = true;
     async function load() {
+      if (!user) return;
       startTransition(() => { setLoading(true); });
       try {
         const token = localStorage.getItem("ssdp_token");

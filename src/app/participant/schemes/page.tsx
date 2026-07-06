@@ -47,8 +47,7 @@ export default function ParticipantTrainingPage() {
       .then(({ data }) => {
         setExisting(data);
         setLoading(false);
-      })
-      .catch(() => {
+      }, () => {
         setExisting(null);
         setLoading(false);
       });
