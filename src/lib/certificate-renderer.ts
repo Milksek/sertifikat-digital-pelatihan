@@ -68,11 +68,11 @@ export async function renderCertificatePng(input: RenderCertificateInput) {
   const overlay = `
     <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
       <style>
-        .title { fill: #ffffff; font-size: ${Math.round(width * 0.03)}px; font-weight: 700; font-family: 'Poppins', sans-serif; }
-        .name { fill: #ffffff; font-size: ${Math.round(width * 0.048)}px; font-weight: 700; font-family: 'Poppins', sans-serif; }
-        .label { fill: #ffffff; font-size: ${Math.round(width * 0.015)}px; font-weight: 600; font-family: 'Poppins', sans-serif; letter-spacing: 1.2px; }
-        .value { fill: #ffffff; font-size: ${Math.round(width * 0.018)}px; font-weight: 700; font-family: 'Poppins', sans-serif; }
-        .field { fill: #ffffff; font-size: 36px; font-weight: 600; font-family: 'Poppins', sans-serif; }
+        .title { fill: #ffffff; font-size: ${Math.round(width * 0.03)}px; font-weight: 700; font-family: Arial, Helvetica, sans-serif; }
+        .name { fill: #ffffff; font-size: ${Math.round(width * 0.048)}px; font-weight: 700; font-family: Arial, Helvetica, sans-serif; }
+        .label { fill: #ffffff; font-size: ${Math.round(width * 0.015)}px; font-weight: 600; font-family: Arial, Helvetica, sans-serif; letter-spacing: 1.2px; }
+        .value { fill: #ffffff; font-size: ${Math.round(width * 0.018)}px; font-weight: 700; font-family: Arial, Helvetica, sans-serif; }
+        .field { fill: #ffffff; font-size: 36px; font-weight: 600; font-family: Arial, Helvetica, sans-serif; }
       </style>
  
       <!-- Nama Peserta (Rata kiri, mulai dari sisi kiri area abu-abu kanan) -->
