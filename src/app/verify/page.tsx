@@ -279,14 +279,28 @@ export default function VerifyPage() {
                     }}
                   />
                   {result.ipfs_image_uri && (
-                    <details className="mt-4 rounded-xl border border-slate-100 bg-slate-50">
-                      <summary className="cursor-pointer px-4 py-3 text-xs font-semibold text-slate-500">Lihat gambar asli dari IPFS</summary>
-                      <img
-                        src={result.ipfs_image_uri.startsWith("ipfs://") ? `https://ipfs.io/ipfs/${result.ipfs_image_uri.replace("ipfs://", "")}` : result.ipfs_image_uri}
-                        alt={`Sertifikat asli ${result.participant_name || result.certificate_number}`}
-                        className="w-full rounded-b-xl border-t border-slate-100"
-                        loading="lazy"
-                      />
+                    <details className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-4">
+                      <summary className="cursor-pointer text-xs font-semibold text-slate-500">Tautan IPFS</summary>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <a
+                          href={result.ipfs_image_uri.startsWith("ipfs://") ? `https://ipfs.io/ipfs/${result.ipfs_image_uri.replace("ipfs://", "")}` : result.ipfs_image_uri}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-slate-50"
+                        >
+                          🖼 Gambar PNG
+                        </a>
+                        {result.metadata_uri && (
+                          <a
+                            href={result.metadata_uri.startsWith("ipfs://") ? `https://ipfs.io/ipfs/${result.metadata_uri.replace("ipfs://", "")}` : result.metadata_uri}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-slate-50"
+                          >
+                            📄 Metadata JSON
+                          </a>
+                        )}
+                      </div>
                     </details>
                   )}
                 </div>

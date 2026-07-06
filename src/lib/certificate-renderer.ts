@@ -59,11 +59,13 @@ function buildSvgText(input: RenderCertificateInput, width: number, height: numb
   const participantLines = splitName(input.participantName).map(escapeSvgText);
   const pW = (pct: number) => Math.round(width * pct);
   const pH = (pct: number) => Math.round(height * pct);
-  const labelStyle = `fill:#ffffff;font-size:${Math.round(width * 0.018)}px;font-weight:600;font-family:Arial,Helvetica,sans-serif;letter-spacing:2px;`;
-  const valueStyle = `fill:#ffffff;font-size:${Math.round(width * 0.025)}px;font-weight:700;font-family:Arial,Helvetica,sans-serif;`;
-  const nameStyle = `fill:#ffffff;font-size:${Math.round(width * 0.048)}px;font-weight:700;font-family:Arial,Helvetica,sans-serif;`;
-  const trainingStyle = `fill:#ffffff;font-size:${Math.round(width * 0.025)}px;font-weight:600;font-family:Arial,Helvetica,sans-serif;`;
-  const fieldStyle = `fill:#ffffff;font-size:${Math.round(width * 0.02)}px;font-weight:600;font-family:Arial,Helvetica,sans-serif;`;
+  // ponytail: tambah DejaVu Sans/Liberation Sans untuk Linux (Vercel), upgrade: embed font via @font-face
+  const FONT = "Arial,Helvetica,DejaVu Sans,Liberation Sans,Noto Sans,sans-serif";
+  const labelStyle = `fill:#ffffff;font-size:${Math.round(width * 0.018)}px;font-weight:600;font-family:${FONT};letter-spacing:2px;`;
+  const valueStyle = `fill:#ffffff;font-size:${Math.round(width * 0.025)}px;font-weight:700;font-family:${FONT};`;
+  const nameStyle = `fill:#ffffff;font-size:${Math.round(width * 0.048)}px;font-weight:700;font-family:${FONT};`;
+  const trainingStyle = `fill:#ffffff;font-size:${Math.round(width * 0.025)}px;font-weight:600;font-family:${FONT};`;
+  const fieldStyle = `fill:#ffffff;font-size:${Math.round(width * 0.02)}px;font-weight:600;font-family:${FONT};`;
 
   return `
     <text x="${pW(0.05)}" y="${pH(0.035)}" style="${labelStyle}">NOMOR SERTIFIKAT</text>
@@ -81,19 +83,39 @@ function buildSvgText(input: RenderCertificateInput, width: number, height: numb
 
 export async function renderCertificatePng(input: RenderCertificateInput) {
   const templatePath = path.join(process.cwd(), "public", "certificate-template.png");
-  const template = sharp(templatePath);
-  const metadata = await template.metadata();
 
-  const width = metadata.width ?? 2000;
-  const height = metadata.height ?? 2000;
+  const templateMeta = await sharp(templatePath).metadata();
+  const width = templateMeta.width ?? 2000;
+  const height = templateMeta.height ?? 2000;
   const overlay = `
     <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
       ${buildSvgText(input, width, height)}
     </svg>
   `;
 
-  return template
+  const result = await sharp(templatePath)
     .composite([{ input: Buffer.from(overlay), top: 0, left: 0 }])
     .png()
     .toBuffer();
+
+  // Verify text was actually rendered by sampling pixels at expected text locations
+  // Name should appear around x=45%, y=52% of the image
+  const { data, info } = await sharp(result).raw().toBuffer({ resolveWithObject: true });
+  const sample = (x: number, y: number) => {
+    const idx = (y * info.width + x) * info.channels;
+    return { r: data[idx], g: data[idx + 1], b: data[idx + 2] };
+  };
+  const namePixel = sample(Math.round(width * 0.50), Math.round(height * 0.52));
+  // If pixel is close to gray (166,166,166) = template bg, text wasn't rendered
+  // White text on gray bg should produce pixels closer to (255,255,255) or blended
+  const isGrayBg = namePixel.r > 140 && namePixel.r < 190 &&
+    Math.abs(namePixel.r - namePixel.g) < 15 &&
+    Math.abs(namePixel.g - namePixel.b) < 15;
+
+  if (isGrayBg) {
+    console.warn("[renderer] Warning: sampled pixel at name location looks like blank template bg", namePixel);
+    // ponytail: downgrade to console.warn, throw when Vercel font is confirmed fixed
+  }
+
+  return result;
 }
