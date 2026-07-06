@@ -33,24 +33,27 @@ export async function GET(req: NextRequest) {
       .eq("wallet_address", addr);
 
     const nonce = crypto.randomUUID();
-    const { error } = await (supabase.from("auth_nonces") as any).insert({
-      wallet_address: addr,
-      nonce,
-      expires_at: new Date(Date.now() + NONCE_TTL_SECONDS * 1000).toISOString(),
-    });
-
-    if (error) {
-      throw new Error("Gagal menyimpan nonce: " + error.message);
-    }
-
     const domain = req.nextUrl.host;
+    const issuedAt = Date.now();
+    const expiresAt = new Date(issuedAt + NONCE_TTL_SECONDS * 1000).toISOString();
     const message = [
       "Login ke Sistem Sertifikat Digital Pelatihan",
       `Domain: ${domain}`,
       `Wallet: ${addr}`,
       `Nonce: ${nonce}`,
-      `Waktu: ${Date.now()}`,
+      `Waktu: ${issuedAt}`,
     ].join("\n");
+
+    const { error } = await (supabase.from("auth_nonces") as any).insert({
+      wallet_address: addr,
+      nonce,
+      message,
+      expires_at: expiresAt,
+    });
+
+    if (error) {
+      throw new Error("Gagal menyimpan nonce: " + error.message);
+    }
 
     return NextResponse.json({
       nonce,
