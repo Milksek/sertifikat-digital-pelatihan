@@ -63,10 +63,27 @@ export default function AdminMintPage() {
 
     setLoadingPreviewId(assessmentId);
     try {
-      const response = await fetch(`/api/admin/preview-certificate?assessmentId=${assessmentId}&t=${Date.now()}`, {
-        headers: {
-          Authorization: `Bearer ${token}`
+      // For certified items, use IPFS image directly (faster, no server render)
+      const certItem = items.find(i => i.id === assessmentId);
+      if (certItem?.status === "certified") {
+        const { data: cert } = await supabase
+          .from("sertifikat")
+          .select("ipfs_image_uri")
+          .eq("assessment_id", assessmentId)
+          .maybeSingle();
+        if (cert?.ipfs_image_uri) {
+          const imgUrl = cert.ipfs_image_uri.startsWith("ipfs://")
+            ? `https://ipfs.io/ipfs/${cert.ipfs_image_uri.replace("ipfs://", "")}`
+            : cert.ipfs_image_uri;
+          setPreviewUrl(imgUrl);
+          setPreviewName(participantName);
+          return;
         }
+      }
+
+      // For approved items, generate preview server-side
+      const response = await fetch(`/api/admin/preview-certificate?assessmentId=${assessmentId}&t=${Date.now()}`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
       if (!response.ok) {
         const result = await response.json();
@@ -85,7 +102,7 @@ export default function AdminMintPage() {
   };
 
   const closePreview = () => {
-    if (previewUrl) {
+    if (previewUrl && previewUrl.startsWith("blob:")) {
       URL.revokeObjectURL(previewUrl);
     }
     setPreviewUrl(null);
