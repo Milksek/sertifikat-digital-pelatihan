@@ -267,31 +267,28 @@ export default function VerifyPage() {
 
                 <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                   <p className="mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Preview Sertifikat</p>
-                  {result.ipfs_image_uri ? (
-                    <img
-                      src={result.ipfs_image_uri.startsWith("ipfs://") ? `https://ipfs.io/ipfs/${result.ipfs_image_uri.replace("ipfs://", "")}` : result.ipfs_image_uri}
-                      alt={`Sertifikat ${result.participant_name || result.certificate_number}`}
-                      className="w-full rounded-2xl border border-slate-100"
-                      loading="lazy"
-                      onError={(event) => {
-                        event.currentTarget.style.display = "none";
-                        const fallback = event.currentTarget.nextElementSibling as HTMLElement | null;
-                        if (fallback) fallback.style.display = "block";
-                      }}
-                    />
-                  ) : null}
-                  <div style={{ display: result.ipfs_image_uri ? "none" : "block" }}>
-                    <CertificatePreview
-                      input={{
-                        participantName: result.participant_name || "Peserta",
-                        certificateNumber: result.certificate_number,
-                        trainingName: result.training_name || TRAINING_NAME,
-                        trainingField: result.training_field || TRAINING_FIELD,
-                        issuedAt: result.minted_at || new Date().toISOString(),
-                        walletAddress: result.participant_wallet,
-                      }}
-                    />
-                  </div>
+                  {/* Always render CertificatePreview with live data from verification */}
+                  <CertificatePreview
+                    input={{
+                      participantName: result.participant_name || "Peserta",
+                      certificateNumber: result.certificate_number,
+                      trainingName: result.training_name || TRAINING_NAME,
+                      trainingField: result.training_field || TRAINING_FIELD,
+                      issuedAt: result.minted_at || new Date().toISOString(),
+                      walletAddress: result.participant_wallet,
+                    }}
+                  />
+                  {result.ipfs_image_uri && (
+                    <details className="mt-4 rounded-xl border border-slate-100 bg-slate-50">
+                      <summary className="cursor-pointer px-4 py-3 text-xs font-semibold text-slate-500">Lihat gambar asli dari IPFS</summary>
+                      <img
+                        src={result.ipfs_image_uri.startsWith("ipfs://") ? `https://ipfs.io/ipfs/${result.ipfs_image_uri.replace("ipfs://", "")}` : result.ipfs_image_uri}
+                        alt={`Sertifikat asli ${result.participant_name || result.certificate_number}`}
+                        className="w-full rounded-b-xl border-t border-slate-100"
+                        loading="lazy"
+                      />
+                    </details>
+                  )}
                 </div>
 
                 <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
