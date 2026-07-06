@@ -4,18 +4,14 @@ import { createPublicClient, http, parseAbi } from "viem";
 import { polygonAmoy } from "viem/chains";
 import { TRAINING_FIELD, TRAINING_NAME } from "@/lib/app-config";
 
-// ============================================================
-// Polygon Amoy on-chain client (read-only, no wallet needed)
-// ============================================================
 const POLYGON_AMOY_RPC =
   process.env.POLYGON_AMOY_RPC_URL ||
   "https://rpc-amoy.polygon.technology";
 
 const CONTRACT_ADDRESS = (
   process.env.NEXT_PUBLIC_CERTIFICATE_CONTRACT_ADDRESS || ""
-).toLowerCase();
+).trim().toLowerCase();
 
-// Minimal ERC-721 ABI , cukup untuk ownerOf + tokenURI
 const SBT_ABI = parseAbi([
   "function ownerOf(uint256 tokenId) view returns (address)",
   "function tokenURI(uint256 tokenId) view returns (string)",
@@ -26,9 +22,6 @@ const viemClient = createPublicClient({
   transport: http(POLYGON_AMOY_RPC),
 });
 
-// ============================================================
-// Supabase admin client (service role)
-// ============================================================
 function getAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -36,10 +29,6 @@ function getAdmin() {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
-// ============================================================
-// On-chain verification helper
-// Returns null if contract not configured or token_id missing
-// ============================================================
 async function checkOnChain(tokenId: string | null, participantWallet: string | null): Promise<{
   checked: boolean;
   owner_match: boolean | null;
@@ -139,9 +128,6 @@ async function findCertificateByTokenId(supabase: ReturnType<typeof getAdmin>, t
   };
 }
 
-// ============================================================
-// POST /api/public/verify
-// ============================================================
 export async function POST(req: NextRequest) {
   try {
     const { query } = await req.json();
@@ -153,8 +139,6 @@ export async function POST(req: NextRequest) {
     const forwarded = req.headers.get("x-forwarded-for");
     const verifierIp = forwarded?.split(",")[0]?.trim() || "public";
     const supabase = getAdmin();
-
-    // Step 1: Ambil data dari Supabase
     const { data, error } = await supabase.rpc("verify_certificate_public", {
       search_query: trimmed,
       verifier_ip_input: verifierIp,
@@ -169,8 +153,6 @@ export async function POST(req: NextRequest) {
     if (!result) {
       return NextResponse.json({ found: false, error: "Sertifikat tidak ditemukan." }, { status: 404 });
     }
-
-    // Step 2: Cross-check ke Polygon Amoy (pencocokan data aplikasi dan data on-chain)
     const onChain = await checkOnChain(result.token_id, result.participant_wallet);
 
     return NextResponse.json({

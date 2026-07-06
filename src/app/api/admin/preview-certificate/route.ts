@@ -76,8 +76,6 @@ export async function GET(req: NextRequest) {
     }
 
     const a = assessment as unknown as { id: string; participant?: { full_name?: string | null; wallet_address?: string } | null };
-
-    // Resolve certificate number if it already exists or generate a draft number
     const { data: existingCert } = await admin
       .from("sertifikat")
       .select("certificate_number")

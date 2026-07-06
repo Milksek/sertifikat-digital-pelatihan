@@ -24,7 +24,7 @@ import { buildCertificateNumber } from "@/lib/certificate-number";
 
 export const runtime = "nodejs";
 
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CERTIFICATE_CONTRACT_ADDRESS as `0x${string}` | undefined;
+const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_CERTIFICATE_CONTRACT_ADDRESS || "").trim() as `0x${string}` | undefined;
 const RPC_URL = process.env.POLYGON_AMOY_RPC_URL || "https://rpc-amoy.polygon.technology";
 const PINATA_JWT = process.env.PINATA_JWT;
 const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY as `0x${string}` | string | undefined;

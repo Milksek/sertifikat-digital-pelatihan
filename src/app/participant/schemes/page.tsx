@@ -73,7 +73,6 @@ export default function ParticipantTrainingPage() {
 
   return (
     <div className="space-y-6">
-      {/* Hero */}
       <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.12),_transparent_30%),linear-gradient(135deg,_#ffffff_0%,_#f8fafc_55%,_#ecfdf5_100%)] p-6 shadow-sm sm:p-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-3">
@@ -90,9 +89,7 @@ export default function ParticipantTrainingPage() {
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
-        {/* Info pelatihan */}
         <div className="space-y-4">
-          {/* Detail */}
           <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-slate-900"><BookOpen className="h-5 w-5 text-emerald-600" /> Informasi Pelatihan</h2>
             <p className="text-sm leading-7 text-slate-600">
@@ -113,7 +110,6 @@ export default function ParticipantTrainingPage() {
             </div>
           </div>
 
-          {/* Kompetensi */}
           <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-slate-900"><ClipboardList className="h-5 w-5 text-emerald-600" /> Unit Kompetensi</h2>
             <ul className="space-y-2">
@@ -127,7 +123,6 @@ export default function ParticipantTrainingPage() {
           </div>
         </div>
 
-        {/* Aksi pendaftaran */}
         <div className="space-y-4">
           <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="mb-4 text-lg font-bold text-slate-900">Status Pendaftaran</h2>

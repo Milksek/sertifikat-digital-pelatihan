@@ -26,7 +26,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-// Per-role accent config
 const ROLE_THEME = {
   admin: {
     accent: "bg-blue-600",
@@ -105,7 +104,6 @@ export function Sidebar() {
     startTransition(() => { setIsHydrated(true); });
   }, []);
 
-  // Derive resolved name from auth/cache, fallback to DB fetch
   useEffect(() => {
     if (!isHydrated) return;
     startTransition(() => { setResolvedName(null); });
