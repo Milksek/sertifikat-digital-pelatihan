@@ -43,15 +43,15 @@ function buildSvgText(input: PreviewInput, w: number, h: number) {
   const p = (pct: number) => Math.round(w * pct);
   const fs = (pct: number) => Math.round(w * pct);
   return `
-    <text x="${p(0.05)}" y="${p(0.05)}" fill="#94a3b8" font-size="${fs(0.018)}" font-weight="600" font-family="Arial,Helvetica,sans-serif" letter-spacing="2">NOMOR SERTIFIKAT</text>
-    <text x="${p(0.05)}" y="${p(0.09)}" fill="#ffffff" font-size="${fs(0.025)}" font-weight="700" font-family="Arial,Helvetica,sans-serif">${esc(input.certificateNumber)}</text>
+    <text x="${p(0.05)}" y="${p(0.035)}" fill="#ffffff" font-size="${fs(0.018)}" font-weight="600" font-family="Arial,Helvetica,sans-serif" letter-spacing="2">NOMOR SERTIFIKAT</text>
+    <text x="${p(0.05)}" y="${p(0.07)}" fill="#ffffff" font-size="${fs(0.025)}" font-weight="700" font-family="Arial,Helvetica,sans-serif">${esc(input.certificateNumber)}</text>
     <text x="${p(0.45)}" y="${p(0.52)}" fill="#ffffff" font-size="${fs(0.048)}" font-weight="700" font-family="Arial,Helvetica,sans-serif">${esc(lines[0] ?? "Peserta")}</text>
     ${lines[1] ? `<text x="${p(0.45)}" y="${p(0.59)}" fill="#ffffff" font-size="${fs(0.048)}" font-weight="700" font-family="Arial,Helvetica,sans-serif">${esc(lines[1])}</text>` : ""}
     <text x="${p(0.45)}" y="${p(0.73)}" fill="#ffffff" font-size="${fs(0.025)}" font-weight="600" font-family="Arial,Helvetica,sans-serif">${esc(input.trainingName)}</text>
     <text x="${p(0.70)}" y="${p(0.68)}" fill="#ffffff" font-size="${fs(0.020)}" font-weight="600" font-family="Arial,Helvetica,sans-serif" text-anchor="middle">${esc(input.trainingField)}</text>
-    <text x="${p(0.45)}" y="${p(0.78)}" fill="#94a3b8" font-size="${fs(0.015)}" font-weight="600" font-family="Arial,Helvetica,sans-serif" letter-spacing="1.5">TANGGAL TERBIT</text>
+    <text x="${p(0.45)}" y="${p(0.78)}" fill="#ffffff" font-size="${fs(0.015)}" font-weight="600" font-family="Arial,Helvetica,sans-serif" letter-spacing="1.5">TANGGAL TERBIT</text>
     <text x="${p(0.45)}" y="${p(0.81)}" fill="#ffffff" font-size="${fs(0.020)}" font-weight="700" font-family="Arial,Helvetica,sans-serif">${esc(fmtDate(input.issuedAt))}</text>
-    <text x="${p(0.65)}" y="${p(0.78)}" fill="#94a3b8" font-size="${fs(0.015)}" font-weight="600" font-family="Arial,Helvetica,sans-serif" letter-spacing="1.5">WALLET PESERTA</text>
+    <text x="${p(0.65)}" y="${p(0.78)}" fill="#ffffff" font-size="${fs(0.015)}" font-weight="600" font-family="Arial,Helvetica,sans-serif" letter-spacing="1.5">WALLET PESERTA</text>
     <text x="${p(0.65)}" y="${p(0.81)}" fill="#ffffff" font-size="${fs(0.020)}" font-weight="700" font-family="Arial,Helvetica,sans-serif">${esc(shortAddr(input.walletAddress))}</text>
   `;
 }
