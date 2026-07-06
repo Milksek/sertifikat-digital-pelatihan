@@ -140,10 +140,10 @@ export async function POST(req: NextRequest) {
     const verifierIp = forwarded?.split(",")[0]?.trim() || "public";
     const supabase = getAdmin();
 
-    // Numeric queries: exact token_id match first, then RPC
-    let result = /^\d+$/.test(trimmed) ? await findCertificateByTokenId(supabase, trimmed) : null;
+    const isNumeric = /^\d+$/.test(trimmed);
+    let result = isNumeric ? await findCertificateByTokenId(supabase, trimmed) : null;
 
-    if (!result) {
+    if (!result && !isNumeric) {
       const { data, error } = await supabase.rpc("verify_certificate_public", {
         search_query: trimmed,
         verifier_ip_input: verifierIp,
@@ -153,9 +153,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
-      const rpcResult = Array.isArray(data) ? data[0] : data;
-      result = rpcResult ?? (!/^\d+$/.test(trimmed) ? await findCertificateByTokenId(supabase, trimmed) : null);
+      result = Array.isArray(data) ? data[0] : data;
     }
+
     if (!result) {
       return NextResponse.json({ found: false, error: "Sertifikat tidak ditemukan." }, { status: 404 });
     }
