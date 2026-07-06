@@ -264,6 +264,18 @@ export default function VerifyPage() {
                   </div>
                 </div>
 
+                {result.ipfs_image_uri && (
+                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 mb-4">Preview Sertifikat</p>
+                    <img
+                      src={result.ipfs_image_uri.startsWith("ipfs://") ? `https://ipfs.io/ipfs/${result.ipfs_image_uri.replace("ipfs://", "")}` : result.ipfs_image_uri}
+                      alt={`Sertifikat ${result.participant_name || result.certificate_number}`}
+                      className="w-full rounded-2xl border border-slate-100"
+                      loading="lazy"
+                    />
+                  </div>
+                )}
+
                 <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                   <div className="grid gap-4 md:grid-cols-2">
                     <Field label="Nomor Sertifikat" value={result.certificate_number} />
