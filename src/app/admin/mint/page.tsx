@@ -11,6 +11,7 @@ import { CERTIFICATE_ISSUER, CERTIFICATE_TITLE, TRAINING_FIELD, TRAINING_NAME } 
 import { getAssessmentStatusBadgeClass, getAssessmentStatusLabel } from "@/lib/status-labels";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { generatePreviewDataUri } from "@/components/certificate-preview";
 
 type AssessmentRow = { id: string; status: string; recommendation: string | null; created_at: string; participant?: { full_name: string | null; wallet_address: string } | null; };
 type MintResult = { certificate_number: string; token_id: string; tx_hash: string; metadata_url: string | null; };
@@ -58,14 +59,12 @@ export default function AdminMintPage() {
   };
 
   const handlePreview = async (assessmentId: string, participantName: string) => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("ssdp_token") : null;
-    if (!token) return setMessage({ type: "error", text: "Sesi admin tidak ditemukan. Login ulang dulu." });
-
     setLoadingPreviewId(assessmentId);
     try {
-      // For certified items, use IPFS image directly (faster, no server render)
-      const certItem = items.find(i => i.id === assessmentId);
-      if (certItem?.status === "certified") {
+      const item = items.find(i => i.id === assessmentId);
+
+      // For certified items, try IPFS image first (has real template)
+      if (item?.status === "certified") {
         const { data: cert } = await supabase
           .from("sertifikat")
           .select("ipfs_image_uri")
@@ -81,30 +80,26 @@ export default function AdminMintPage() {
         }
       }
 
-      // For approved items, generate preview server-side
-      const response = await fetch(`/api/admin/preview-certificate?assessmentId=${assessmentId}&t=${Date.now()}`, {
-        headers: { Authorization: `Bearer ${token}` }
+      // Client-side SVG preview (always works, no server needed)
+      const wallet = item?.participant?.wallet_address || "0x0000000000000000000000000000000000000000";
+      const svgDataUri = generatePreviewDataUri({
+        participantName: participantName || "Peserta",
+        certificateNumber: `SDP-JWD-${assessmentId.slice(0, 8).toUpperCase()}`,
+        trainingName: TRAINING_NAME,
+        trainingField: TRAINING_FIELD,
+        issuedAt: new Date().toISOString(),
+        walletAddress: wallet,
       });
-      if (!response.ok) {
-        const result = await response.json();
-        throw new Error(result?.error || "Gagal memuat preview gambar.");
-      }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      setPreviewUrl(url);
+      setPreviewUrl(svgDataUri);
       setPreviewName(participantName);
-    } catch (error) {
-      const text = error instanceof Error ? error.message : "Gagal memuat preview gambar.";
-      toast.error(text);
+    } catch {
+      toast.error("Gagal memuat preview sertifikat.");
     } finally {
       setLoadingPreviewId(null);
     }
   };
 
   const closePreview = () => {
-    if (previewUrl && previewUrl.startsWith("blob:")) {
-      URL.revokeObjectURL(previewUrl);
-    }
     setPreviewUrl(null);
     setPreviewName(null);
   };
