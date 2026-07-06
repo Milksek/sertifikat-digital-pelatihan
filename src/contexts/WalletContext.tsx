@@ -76,7 +76,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         await switchActiveWalletChain(appChain);
       }
 
-      // Fetch server-generated nonce (30s TTL)
+      // Fetch server-generated nonce (60s TTL)
       const nonceRes = await fetch(`/api/auth/nonce?wallet=${address}`);
       if (!nonceRes.ok) {
         const nonceErr = await nonceRes.json().catch(() => ({}));

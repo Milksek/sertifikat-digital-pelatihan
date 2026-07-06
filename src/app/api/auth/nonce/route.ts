@@ -15,7 +15,7 @@ function getAdmin() {
   return _supabaseAdmin;
 }
 
-const NONCE_TTL_SECONDS = 30;
+const NONCE_TTL_SECONDS = 60;
 
 export async function GET(req: NextRequest) {
   try {
