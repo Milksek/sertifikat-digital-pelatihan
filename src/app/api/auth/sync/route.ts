@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { recoverAddress, hashMessage } from "viem";
 
+const NONCE_EXPIRY_SECONDS = 60;
+
 const MASTER_WALLET = (
   process.env.MASTER_WALLET_ADDRESS ??
   "0x1cb90a414ade635dcfa78e41a825c789edde4d8e"
@@ -101,44 +103,71 @@ export async function POST(req: NextRequest) {
     // ── Nonce + signature verification ──
     if (message && signature) {
       const supabaseNonce = getAdmin();
-      // Extract nonce from message
       const nonceLine = (message as string).split("\n").find((l) => l.startsWith("Nonce: "));
+      const issuedAtLine = (message as string).split("\n").find((l) => l.startsWith("Waktu: "));
       const nonce = nonceLine?.replace("Nonce: ", "").trim();
+      const issuedAtMs = Number(issuedAtLine?.replace("Waktu: ", "").trim() || 0);
       if (!nonce) {
-        return NextResponse.json({ error: "Nonce tidak ditemukan dalam pesan" }, { status: 400 });
+        return NextResponse.json({ error: "Nonce tidak valid" }, { status: 400 });
       }
 
-      // Check nonce exists + not expired
       const { data: nonceRow } = await (supabaseNonce
         .from("auth_nonces") as any)
-        .select("id, expires_at")
+        .select("id, message, expires_at, used_at, created_at")
         .eq("wallet_address", addr)
         .eq("nonce", nonce)
         .maybeSingle();
 
+      const now = new Date();
+      const expiresAt = nonceRow?.expires_at ? new Date(nonceRow.expires_at) : null;
+      const nonceAgeSeconds = issuedAtMs > 0 ? Math.floor((now.getTime() - issuedAtMs) / 1000) : null;
+
+      console.info("[auth/sync] verify", {
+        wallet: addr,
+        nonceExists: Boolean(nonceRow),
+        nonceTimestamp: nonceRow?.created_at ?? null,
+        currentServerTime: now.toISOString(),
+        nonceAgeSeconds,
+        expired: expiresAt ? expiresAt < now : null,
+        verifyCalledTwice: Boolean(nonceRow?.used_at),
+      });
+
       if (!nonceRow) {
-        return NextResponse.json({ error: "Nonce sudah digunakan atau tidak valid" }, { status: 401 });
+        return NextResponse.json({ error: "Nonce tidak valid" }, { status: 401 });
       }
-      if (new Date(nonceRow.expires_at) < new Date()) {
-        await (supabaseNonce.from("auth_nonces") as any).delete().eq("id", nonceRow.id);
-        return NextResponse.json({ error: "Nonce sudah kedaluwarsa. Silakan coba login lagi." }, { status: 401 });
+      if (nonceRow.used_at) {
+        return NextResponse.json({ error: "Nonce sudah digunakan" }, { status: 401 });
+      }
+      if (nonceRow.message !== message) {
+        return NextResponse.json({ error: "Nonce tidak valid" }, { status: 401 });
+      }
+      if (!expiresAt || expiresAt < now) {
+        await (supabaseNonce.from("auth_nonces") as any)
+          .update({ used_at: now.toISOString() })
+          .eq("id", nonceRow.id)
+          .is("used_at", null);
+        return NextResponse.json({ error: "Nonce kedaluwarsa" }, { status: 401 });
       }
 
-      // Verify signature
       try {
         const recovered = await recoverAddress({
           hash: hashMessage(message),
           signature: signature as `0x${string}`,
         });
         if (recovered.toLowerCase() !== addr) {
-          return NextResponse.json({ error: "Tanda tangan tidak valid" }, { status: 401 });
+          return NextResponse.json({ error: "Nonce tidak valid" }, { status: 401 });
         }
       } catch {
-        return NextResponse.json({ error: "Tanda tangan tidak valid" }, { status: 401 });
+        return NextResponse.json({ error: "Nonce tidak valid" }, { status: 401 });
       }
 
-      // Delete used nonce (one-time use)
-      await (supabaseNonce.from("auth_nonces") as any).delete().eq("id", nonceRow.id);
+      const { error: consumeError } = await (supabaseNonce.from("auth_nonces") as any)
+        .update({ used_at: now.toISOString() })
+        .eq("id", nonceRow.id)
+        .is("used_at", null);
+      if (consumeError) {
+        throw new Error(`Gagal menandai nonce terpakai: ${consumeError.message}`);
+      }
     }
     const syntheticEmail = `${addr.slice(2)}@wallet.local`;
     const syntheticPassword = `${addr}-ssdp-wallet-login`;

@@ -15,7 +15,7 @@ function getAdmin() {
   return _supabaseAdmin;
 }
 
-const NONCE_TTL_SECONDS = 60;
+const NONCE_EXPIRY_SECONDS = 60;
 
 export async function GET(req: NextRequest) {
   try {
@@ -26,16 +26,22 @@ export async function GET(req: NextRequest) {
 
     const addr = wallet.toLowerCase();
     const supabase = getAdmin();
+    const nowIso = new Date().toISOString();
 
-    // Delete expired + old nonces for this wallet
+    // Clean stale rows and invalidate any older active nonce for this wallet.
     await (supabase.from("auth_nonces") as any)
       .delete()
-      .eq("wallet_address", addr);
+      .lt("expires_at", nowIso);
+
+    await (supabase.from("auth_nonces") as any)
+      .update({ used_at: nowIso })
+      .eq("wallet_address", addr)
+      .is("used_at", null);
 
     const nonce = crypto.randomUUID();
     const domain = req.nextUrl.host;
     const issuedAt = Date.now();
-    const expiresAt = new Date(issuedAt + NONCE_TTL_SECONDS * 1000).toISOString();
+    const expiresAt = new Date(issuedAt + NONCE_EXPIRY_SECONDS * 1000).toISOString();
     const message = [
       "Login ke Sistem Sertifikat Digital Pelatihan",
       `Domain: ${domain}`,
@@ -49,16 +55,24 @@ export async function GET(req: NextRequest) {
       nonce,
       message,
       expires_at: expiresAt,
+      used_at: null,
     });
 
     if (error) {
       throw new Error("Gagal menyimpan nonce: " + error.message);
     }
 
+    console.info("[auth/nonce] issued", {
+      wallet: addr,
+      issuedAt,
+      expiresAt,
+    });
+
     return NextResponse.json({
       nonce,
       message,
-      expiresAt: new Date(Date.now() + NONCE_TTL_SECONDS * 1000).toISOString(),
+      expiresAt,
+      expirySeconds: NONCE_EXPIRY_SECONDS,
     });
   } catch (err: any) {
     console.error("[auth/nonce]", err.message);

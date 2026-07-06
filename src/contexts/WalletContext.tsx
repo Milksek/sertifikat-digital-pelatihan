@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, ReactNode, useState } from "react";
+import { createContext, useContext, ReactNode, useRef, useState } from "react";
 import {
   useActiveAccount,
   useActiveWallet,
@@ -37,6 +37,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const switchActiveWalletChain = useSwitchActiveWalletChain();
   const router = useRouter();
   const walletAddress = activeAccount?.address?.toLowerCase() ?? null;
+  const loginInFlightRef = useRef(false);
 
   const connectWallet = async () => {
     if (!hasThirdwebClient || !client) {
@@ -45,7 +46,8 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       });
       return;
     }
-    if (isConnecting || isSigning) return;
+    if (isConnecting || isSigning || loginInFlightRef.current) return;
+    loginInFlightRef.current = true;
     setIsConnecting(true);
     let connectedWallet;
     try {
@@ -136,6 +138,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         description: isRejection ? undefined : error.message,
       });
     } finally {
+      loginInFlightRef.current = false;
       setIsSigning(false);
       setIsConnecting(false);
     }
