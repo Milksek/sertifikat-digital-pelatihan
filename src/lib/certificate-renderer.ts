@@ -11,15 +11,6 @@ type RenderCertificateInput = {
   verifyUrl?: string;
 };
 
-function escapeSvgText(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
-
 function formatIssuedDate(value: string) {
   return new Intl.DateTimeFormat("id-ID", {
     day: "2-digit",
@@ -55,66 +46,113 @@ function splitName(value: string, maxLength = 28) {
   return lines.slice(0, 2);
 }
 
-function buildSvgText(input: RenderCertificateInput, width: number, height: number) {
-  const participantLines = splitName(input.participantName).map(escapeSvgText);
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (ctx.measureText(next).width > maxWidth && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = next;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+async function renderTextCanvas(
+  input: RenderCertificateInput,
+  width: number,
+  height: number,
+): Promise<Buffer> {
+  // @napi-rs/canvas is a hard dependency — imported at call site to avoid
+  // top-level require failures on environments where it's not needed.
+  const { createCanvas } = await import("@napi-rs/canvas");
+
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext("2d");
+
+  // ponytail: position percentages tuned to the existing Canva template.
+  // Upgrade path: read coordinates from template metadata or design file.
   const pW = (pct: number) => Math.round(width * pct);
   const pH = (pct: number) => Math.round(height * pct);
-  // ponytail: tambah DejaVu Sans/Liberation Sans untuk Linux (Vercel), upgrade: embed font via @font-face
-  const FONT = "Arial,Helvetica,DejaVu Sans,Liberation Sans,Noto Sans,sans-serif";
-  const labelStyle = `fill:#ffffff;font-size:${Math.round(width * 0.018)}px;font-weight:600;font-family:${FONT};letter-spacing:2px;`;
-  const valueStyle = `fill:#ffffff;font-size:${Math.round(width * 0.025)}px;font-weight:700;font-family:${FONT};`;
-  const nameStyle = `fill:#ffffff;font-size:${Math.round(width * 0.048)}px;font-weight:700;font-family:${FONT};`;
-  const trainingStyle = `fill:#ffffff;font-size:${Math.round(width * 0.025)}px;font-weight:600;font-family:${FONT};`;
-  const fieldStyle = `fill:#ffffff;font-size:${Math.round(width * 0.02)}px;font-weight:600;font-family:${FONT};`;
+  const px = (pct: number) => Math.round(width * pct);
 
-  return `
-    <text x="${pW(0.05)}" y="${pH(0.035)}" style="${labelStyle}">NOMOR SERTIFIKAT</text>
-    <text x="${pW(0.05)}" y="${pH(0.07)}" style="${valueStyle}">${escapeSvgText(input.certificateNumber)}</text>
-    <text x="${pW(0.45)}" y="${pH(0.52)}" style="${nameStyle}">${participantLines[0] ?? "Peserta"}</text>
-    ${participantLines[1] ? `<text x="${pW(0.45)}" y="${pH(0.59)}" style="${nameStyle}">${participantLines[1]}</text>` : ""}
-    <text x="${pW(0.45)}" y="${pH(0.73)}" style="${trainingStyle}">${escapeSvgText(input.trainingName)}</text>
-    <text x="${pW(0.70)}" y="${pH(0.68)}" style="${fieldStyle}" text-anchor="middle">${escapeSvgText(input.trainingField)}</text>
-    <text x="${pW(0.45)}" y="${pH(0.78)}" style="${labelStyle}">TANGGAL TERBIT</text>
-    <text x="${pW(0.45)}" y="${pH(0.81)}" style="${valueStyle}">${escapeSvgText(formatIssuedDate(input.issuedAt))}</text>
-    <text x="${pW(0.65)}" y="${pH(0.78)}" style="${labelStyle}">WALLET PESERTA</text>
-    <text x="${pW(0.65)}" y="${pH(0.81)}" style="${valueStyle}">${escapeSvgText(shortenWallet(input.walletAddress))}</text>
-  `;
+  const participantLines = splitName(input.participantName);
+
+  // --- NOMOR SERTIFIKAT (top-left) ---
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+
+  ctx.font = `600 ${px(0.018)}px sans-serif`;
+  ctx.fillText("NOMOR SERTIFIKAT", pW(0.05), pH(0.035));
+
+  ctx.font = `700 ${px(0.025)}px sans-serif`;
+  ctx.fillText(input.certificateNumber, pW(0.05), pH(0.07));
+
+  // --- PARTICIPANT NAME (center, large) ---
+  ctx.font = `700 ${px(0.048)}px sans-serif`;
+  ctx.textAlign = "center";
+  if (participantLines[0]) ctx.fillText(participantLines[0], pW(0.50), pH(0.52));
+  if (participantLines[1]) ctx.fillText(participantLines[1], pW(0.50), pH(0.59));
+  ctx.textAlign = "left";
+
+  // --- TRAINING NAME ---
+  ctx.font = `600 ${px(0.025)}px sans-serif`;
+  ctx.fillText(input.trainingName, pW(0.45), pH(0.73));
+
+  // --- TRAINING FIELD (centered at right) ---
+  ctx.font = `600 ${px(0.02)}px sans-serif`;
+  ctx.textAlign = "center";
+  ctx.fillText(input.trainingField, pW(0.70), pH(0.68));
+  ctx.textAlign = "left";
+
+  // --- TANGGAL TERBIT ---
+  ctx.font = `600 ${px(0.018)}px sans-serif`;
+  ctx.fillText("TANGGAL TERBIT", pW(0.45), pH(0.78));
+
+  ctx.font = `700 ${px(0.025)}px sans-serif`;
+  ctx.fillText(formatIssuedDate(input.issuedAt), pW(0.45), pH(0.81));
+
+  // --- WALLET PESERTA ---
+  ctx.font = `600 ${px(0.018)}px sans-serif`;
+  ctx.fillText("WALLET PESERTA", pW(0.65), pH(0.78));
+
+  ctx.font = `700 ${px(0.025)}px sans-serif`;
+  ctx.fillText(shortenWallet(input.walletAddress), pW(0.65), pH(0.81));
+
+  return canvas.toBuffer("image/png");
 }
 
 export async function renderCertificatePng(input: RenderCertificateInput) {
   const templatePath = path.join(process.cwd(), "public", "certificate-template.png");
-
   const templateMeta = await sharp(templatePath).metadata();
   const width = templateMeta.width ?? 2000;
   const height = templateMeta.height ?? 2000;
-  const overlay = `
-    <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
-      ${buildSvgText(input, width, height)}
-    </svg>
-  `;
+
+  // Primary: @napi-rs/canvas — Skia-based, bundles own fonts, works on Vercel Linux
+  const textBuffer = await renderTextCanvas(input, width, height);
 
   const result = await sharp(templatePath)
-    .composite([{ input: Buffer.from(overlay), top: 0, left: 0 }])
+    .composite([{ input: textBuffer, top: 0, left: 0 }])
     .png()
     .toBuffer();
 
-  // Verify text was actually rendered by sampling pixels at expected text locations
-  // Name should appear around x=45%, y=52% of the image
+  // Pixel validation: sample name area to verify text was rendered
   const { data, info } = await sharp(result).raw().toBuffer({ resolveWithObject: true });
-  const sample = (x: number, y: number) => {
-    const idx = (y * info.width + x) * info.channels;
-    return { r: data[idx], g: data[idx + 1], b: data[idx + 2] };
-  };
-  const namePixel = sample(Math.round(width * 0.50), Math.round(height * 0.52));
-  // If pixel is close to gray (166,166,166) = template bg, text wasn't rendered
-  // White text on gray bg should produce pixels closer to (255,255,255) or blended
+  const sampleIdx = (Math.round(height * 0.52) * info.width + Math.round(width * 0.50)) * info.channels;
+  const namePixel = { r: data[sampleIdx], g: data[sampleIdx + 1], b: data[sampleIdx + 2] };
   const isGrayBg = namePixel.r > 140 && namePixel.r < 190 &&
     Math.abs(namePixel.r - namePixel.g) < 15 &&
     Math.abs(namePixel.g - namePixel.b) < 15;
 
   if (isGrayBg) {
-    console.warn("[renderer] Warning: sampled pixel at name location looks like blank template bg", namePixel);
-    // ponytail: downgrade to console.warn, throw when Vercel font is confirmed fixed
+    console.warn("[renderer] Warning: name area pixel looks like blank template bg", namePixel);
   }
 
   return result;
