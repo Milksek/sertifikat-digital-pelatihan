@@ -1,16 +1,47 @@
 "use client";
 import { Sidebar } from "./sidebar";
-import { Role } from "../providers/auth-provider";
+import { Role, useAuth } from "../providers/auth-provider";
 import { Loader2 } from "lucide-react";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
+import { useRouter } from "next/navigation";
+
 interface DashboardLayoutProps {
   children: React.ReactNode;
   allowedRoles: Role[];
 }
+
 export function DashboardLayout({
   children,
-  allowedRoles: _allowedRoles,
+  allowedRoles,
 }: DashboardLayoutProps) {
+  const { role, isLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (role && !allowedRoles.includes(role)) {
+      // Redirect to the correct dashboard based on role
+      if (role === "admin") router.replace("/admin/dashboard");
+      else if (role === "assessor") router.replace("/assessor/dashboard");
+      else if (role === "participant") router.replace("/participant/dashboard");
+      else router.replace("/login");
+    }
+  }, [role, isLoading, allowedRoles, router]);
+
+  // Still loading — show spinner
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-100/80 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-slate-500" />
+      </div>
+    );
+  }
+
+  // Role not allowed — show nothing (redirect is in progress)
+  if (!allowedRoles.includes(role)) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-slate-100/80">
       <Sidebar />
@@ -30,4 +61,3 @@ export function DashboardLayout({
     </div>
   );
 }
-
