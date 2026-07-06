@@ -13,6 +13,7 @@ import { appChain, client, hasThirdwebClient } from "@/lib/thirdweb";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+
 interface WalletContextType {
   walletAddress: string | null;
   isConnecting: boolean;
@@ -21,8 +22,10 @@ interface WalletContextType {
   connectWallet: () => Promise<void>;
   disconnectWallet: () => void;
 }
+
 const MASTER_WALLET = "0x1cb90a414ade635dcfa78e41a825c789edde4d8e";
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
+
 export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const activeAccount = useActiveAccount();
   const activeWallet = useActiveWallet();
@@ -34,6 +37,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const switchActiveWalletChain = useSwitchActiveWalletChain();
   const router = useRouter();
   const walletAddress = activeAccount?.address?.toLowerCase() ?? null;
+
   const connectWallet = async () => {
     if (!hasThirdwebClient || !client) {
       toast.error("Konfigurasi wallet belum lengkap.", {
@@ -72,16 +76,19 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         await switchActiveWalletChain(appChain);
       }
 
-      const domain = window.location.host;
-      const message = `Login ke Sistem Sertifikat Digital Pelatihan
-Domain: ${domain}
-Wallet: ${address}
-Waktu: ${Date.now()}`;
-      await account.signMessage({ message });
+      // Fetch server-generated nonce (30s TTL)
+      const nonceRes = await fetch(`/api/auth/nonce?wallet=${address}`);
+      if (!nonceRes.ok) {
+        const nonceErr = await nonceRes.json().catch(() => ({}));
+        throw new Error(nonceErr.error || "Gagal mengambil nonce");
+      }
+      const { message: nonceMessage } = await nonceRes.json();
+
+      const signature = await account.signMessage({ message: nonceMessage });
       const res = await fetch("/api/auth/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ walletAddress: address }),
+        body: JSON.stringify({ walletAddress: address, message: nonceMessage, signature }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Server error" }));
@@ -133,11 +140,13 @@ Waktu: ${Date.now()}`;
       setIsConnecting(false);
     }
   };
+
   const disconnectWallet = () => {
     if (activeWallet) disconnect(activeWallet);
     localStorage.removeItem("ssdp_token");
     toast.info("Wallet terputus");
   };
+
   return (
     <WalletContext.Provider
       value={{
@@ -153,6 +162,7 @@ Waktu: ${Date.now()}`;
     </WalletContext.Provider>
   );
 };
+
 export const useWallet = () => {
   const ctx = useContext(WalletContext);
   if (!ctx) throw new Error("useWallet must be used within WalletProvider");
