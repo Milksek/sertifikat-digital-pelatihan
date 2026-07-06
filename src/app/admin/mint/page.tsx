@@ -11,7 +11,7 @@ import { CERTIFICATE_ISSUER, CERTIFICATE_TITLE, TRAINING_FIELD, TRAINING_NAME } 
 import { getAssessmentStatusBadgeClass, getAssessmentStatusLabel } from "@/lib/status-labels";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { generatePreviewDataUri, CertificatePreview } from "@/components/certificate-preview";
+import { CertificatePreview } from "@/components/certificate-preview";
 
 type AssessmentRow = { id: string; status: string; recommendation: string | null; created_at: string; participant?: { full_name: string | null; wallet_address: string } | null; };
 type MintResult = { certificate_number: string; token_id: string; tx_hash: string; metadata_url: string | null; };
