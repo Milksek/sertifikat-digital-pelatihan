@@ -139,17 +139,23 @@ export async function POST(req: NextRequest) {
     const forwarded = req.headers.get("x-forwarded-for");
     const verifierIp = forwarded?.split(",")[0]?.trim() || "public";
     const supabase = getAdmin();
-    const { data, error } = await supabase.rpc("verify_certificate_public", {
-      search_query: trimmed,
-      verifier_ip_input: verifierIp,
-    });
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    // Numeric queries: exact token_id match first, then RPC
+    let result = /^\d+$/.test(trimmed) ? await findCertificateByTokenId(supabase, trimmed) : null;
+
+    if (!result) {
+      const { data, error } = await supabase.rpc("verify_certificate_public", {
+        search_query: trimmed,
+        verifier_ip_input: verifierIp,
+      });
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      const rpcResult = Array.isArray(data) ? data[0] : data;
+      result = rpcResult ?? (!/^\d+$/.test(trimmed) ? await findCertificateByTokenId(supabase, trimmed) : null);
     }
-
-    const rpcResult = Array.isArray(data) ? data[0] : data;
-    const result = rpcResult ?? await findCertificateByTokenId(supabase, trimmed);
     if (!result) {
       return NextResponse.json({ found: false, error: "Sertifikat tidak ditemukan." }, { status: 404 });
     }
