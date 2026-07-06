@@ -11,7 +11,7 @@ import { CERTIFICATE_ISSUER, CERTIFICATE_TITLE, TRAINING_FIELD, TRAINING_NAME } 
 import { getAssessmentStatusBadgeClass, getAssessmentStatusLabel } from "@/lib/status-labels";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { generatePreviewDataUri } from "@/components/certificate-preview";
+import { generatePreviewDataUri, CertificatePreview } from "@/components/certificate-preview";
 
 type AssessmentRow = { id: string; status: string; recommendation: string | null; created_at: string; participant?: { full_name: string | null; wallet_address: string } | null; };
 type MintResult = { certificate_number: string; token_id: string; tx_hash: string; metadata_url: string | null; };
@@ -24,6 +24,7 @@ export default function AdminMintPage() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewName, setPreviewName] = useState<string | null>(null);
+  const [previewCertId, setPreviewCertId] = useState<string | null>(null);
   const [loadingPreviewId, setLoadingPreviewId] = useState<string | null>(null);
 
   const loadItems = async () => {
@@ -76,22 +77,15 @@ export default function AdminMintPage() {
             : cert.ipfs_image_uri;
           setPreviewUrl(imgUrl);
           setPreviewName(participantName);
+          setPreviewCertId(assessmentId);
           return;
         }
       }
 
-      // Client-side SVG preview (always works, no server needed)
-      const wallet = item?.participant?.wallet_address || "0x0000000000000000000000000000000000000000";
-      const svgDataUri = generatePreviewDataUri({
-        participantName: participantName || "Peserta",
-        certificateNumber: `SDP-JWD-${assessmentId.slice(0, 8).toUpperCase()}`,
-        trainingName: TRAINING_NAME,
-        trainingField: TRAINING_FIELD,
-        issuedAt: new Date().toISOString(),
-        walletAddress: wallet,
-      });
-      setPreviewUrl(svgDataUri);
+      // Client-side preview with real template (always works, no server)
+      setPreviewUrl("client");
       setPreviewName(participantName);
+      setPreviewCertId(assessmentId);
     } catch {
       toast.error("Gagal memuat preview sertifikat.");
     } finally {
@@ -102,6 +96,7 @@ export default function AdminMintPage() {
   const closePreview = () => {
     setPreviewUrl(null);
     setPreviewName(null);
+    setPreviewCertId(null);
   };
 
   return (
@@ -144,13 +139,26 @@ export default function AdminMintPage() {
             <DialogTitle className="text-xl font-bold text-white">Preview Sertifikat - {previewName}</DialogTitle>
           </DialogHeader>
           <div className="mt-4 flex justify-center items-center rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 p-2">
-            {previewUrl && (
+            {previewUrl && previewUrl !== "client" ? (
               <img
                 src={previewUrl}
                 alt="Preview Sertifikat"
                 className="max-h-[70vh] w-auto object-contain rounded-xl"
               />
-            )}
+            ) : previewCertId ? (
+              <div className="w-full">
+                <CertificatePreview
+                  input={{
+                    participantName: previewName || "Peserta",
+                    certificateNumber: `SDP-JWD-${previewCertId.slice(0, 8).toUpperCase()}`,
+                    trainingName: TRAINING_NAME,
+                    trainingField: TRAINING_FIELD,
+                    issuedAt: new Date().toISOString(),
+                    walletAddress: items.find(i => i.id === previewCertId)?.participant?.wallet_address || "0x0000000000000000000000000000000000000000",
+                  }}
+                />
+              </div>
+            ) : null}
           </div>
         </DialogContent>
       </Dialog>
