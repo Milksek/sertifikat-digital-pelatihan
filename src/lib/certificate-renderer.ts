@@ -1,10 +1,20 @@
 import path from "node:path";
+import fs from "node:fs";
 import sharp from "sharp";
 import { GlobalFonts } from "@napi-rs/canvas";
 
-const fontPath = path.join(process.cwd(), "public", "fonts", "Inter-Variable.ttf");
-if (!GlobalFonts.families.includes("Inter")) {
-  GlobalFonts.registerFromPath(fontPath, "Inter");
+const FONT_NAME = "Inter";
+if (!GlobalFonts.has(FONT_NAME)) {
+  try {
+    const fontPath = path.join(process.cwd(), "public", "fonts", "Inter-Variable.ttf");
+    const fontBuffer = fs.readFileSync(fontPath);
+    const ok = GlobalFonts.registerFromBuffer(fontBuffer, FONT_NAME);
+    if (!ok) {
+      console.warn("[renderer] Gagal register font Inter dari buffer (null)");
+    }
+  } catch (err) {
+    console.warn("[renderer] Error register font Inter:", err);
+  }
 }
 
 type RenderCertificateInput = {
