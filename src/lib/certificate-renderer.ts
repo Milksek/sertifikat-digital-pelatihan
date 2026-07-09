@@ -1,5 +1,11 @@
 import path from "node:path";
 import sharp from "sharp";
+import { GlobalFonts } from "@napi-rs/canvas";
+
+const fontPath = path.join(process.cwd(), "public", "fonts", "Inter-Variable.ttf");
+if (!GlobalFonts.families.includes("Inter")) {
+  GlobalFonts.registerFromPath(fontPath, "Inter");
+}
 
 type RenderCertificateInput = {
   participantName: string;
@@ -89,41 +95,41 @@ async function renderTextCanvas(
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
 
-  ctx.font = `600 ${px(0.018)}px sans-serif`;
+  ctx.font = `600 ${px(0.018)}px Inter`;
   ctx.fillText("NOMOR SERTIFIKAT", pW(0.05), pH(0.035));
 
-  ctx.font = `700 ${px(0.025)}px sans-serif`;
+  ctx.font = `700 ${px(0.025)}px Inter`;
   ctx.fillText(input.certificateNumber, pW(0.05), pH(0.07));
 
   // --- PARTICIPANT NAME (center, large) ---
-  ctx.font = `700 ${px(0.048)}px sans-serif`;
+  ctx.font = `700 ${px(0.048)}px Inter`;
   ctx.textAlign = "center";
   if (participantLines[0]) ctx.fillText(participantLines[0], pW(0.50), pH(0.52));
   if (participantLines[1]) ctx.fillText(participantLines[1], pW(0.50), pH(0.59));
   ctx.textAlign = "left";
 
   // --- TRAINING NAME ---
-  ctx.font = `600 ${px(0.025)}px sans-serif`;
+  ctx.font = `600 ${px(0.025)}px Inter`;
   ctx.fillText(input.trainingName, pW(0.45), pH(0.73));
 
   // --- TRAINING FIELD (centered at right) ---
-  ctx.font = `600 ${px(0.02)}px sans-serif`;
+  ctx.font = `600 ${px(0.02)}px Inter`;
   ctx.textAlign = "center";
   ctx.fillText(input.trainingField, pW(0.70), pH(0.68));
   ctx.textAlign = "left";
 
   // --- TANGGAL TERBIT ---
-  ctx.font = `600 ${px(0.018)}px sans-serif`;
+  ctx.font = `600 ${px(0.018)}px Inter`;
   ctx.fillText("TANGGAL TERBIT", pW(0.45), pH(0.78));
 
-  ctx.font = `700 ${px(0.025)}px sans-serif`;
+  ctx.font = `700 ${px(0.025)}px Inter`;
   ctx.fillText(formatIssuedDate(input.issuedAt), pW(0.45), pH(0.81));
 
   // --- WALLET PESERTA ---
-  ctx.font = `600 ${px(0.018)}px sans-serif`;
+  ctx.font = `600 ${px(0.018)}px Inter`;
   ctx.fillText("WALLET PESERTA", pW(0.65), pH(0.78));
 
-  ctx.font = `700 ${px(0.025)}px sans-serif`;
+  ctx.font = `700 ${px(0.025)}px Inter`;
   ctx.fillText(shortenWallet(input.walletAddress), pW(0.65), pH(0.81));
 
   return canvas.toBuffer("image/png");
