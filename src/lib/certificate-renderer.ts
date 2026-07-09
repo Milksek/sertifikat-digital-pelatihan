@@ -8,9 +8,9 @@ if (!GlobalFonts.has(FONT_NAME)) {
   try {
     const fontPath = path.join(process.cwd(), "public", "fonts", "Inter-Variable.ttf");
     const fontBuffer = fs.readFileSync(fontPath);
-    const ok = GlobalFonts.registerFromBuffer(fontBuffer, FONT_NAME);
+    const ok = GlobalFonts.register(fontBuffer, FONT_NAME);
     if (!ok) {
-      console.warn("[renderer] Gagal register font Inter dari buffer (null)");
+      console.warn("[renderer] Gagal register font Inter (return null)");
     }
   } catch (err) {
     console.warn("[renderer] Error register font Inter:", err);
