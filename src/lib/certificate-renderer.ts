@@ -111,13 +111,11 @@ async function renderTextCanvas(
   ctx.font = `700 ${px(0.025)}px Inter`;
   ctx.fillText(input.certificateNumber, pW(0.05), pH(0.07));
 
-  // --- PARTICIPANT NAME (center, large) ---
+  // --- PARTICIPANT NAME (aligned with training name left edge) ---
   ctx.font = `700 ${px(0.048)}px Inter`;
-  ctx.textAlign = "center";
-  if (participantLines[0]) ctx.fillText(participantLines[0], pW(0.50), pH(0.52));
-  if (participantLines[1]) ctx.fillText(participantLines[1], pW(0.50), pH(0.59));
   ctx.textAlign = "left";
-
+  if (participantLines[0]) ctx.fillText(participantLines[0], pW(0.45), pH(0.52));
+  if (participantLines[1]) ctx.fillText(participantLines[1], pW(0.45), pH(0.59));
   // --- TRAINING NAME ---
   ctx.font = `600 ${px(0.025)}px Inter`;
   ctx.fillText(input.trainingName, pW(0.45), pH(0.73));
