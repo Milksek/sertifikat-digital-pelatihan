@@ -45,7 +45,10 @@ export default function AdminRevocationsPage() {
     });
     const result = await res.json();
     if (!res.ok) return toast.error(result.error);
-    toast.success("Sertifikat berhasil dicabut.");
+    const burnInfo = result.blockchain?.burn
+      ? ` (On-chain burned: ${result.blockchain.tx_hash?.slice(0, 10)}...)`
+      : " (Database only)";
+    toast.success(`Sertifikat berhasil dicabut${burnInfo}`);
     setRevoking(null);
     setReason("");
     load();
