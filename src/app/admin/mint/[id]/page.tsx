@@ -41,17 +41,25 @@ export default function AdminMintDetailPage() {
   const handleCreateDraft = async () => {
     if (!assessment?.participant?.wallet_address) return;
     setSaving(true);
-    const { error } = await supabase.from("sertifikat").insert({
-      assessment_id: assessment.id,
-      participant_wallet: assessment.participant.wallet_address,
-      training_name: TRAINING_NAME,
-      training_field: TRAINING_FIELD,
-      status: "active",
-      metadata_uri: JSON.stringify(metadataPreview),
+    const profile = JSON.parse(localStorage.getItem("ssdp_profile") || "{}");
+    const wallet = profile.wallet_address;
+    const res = await fetch("/api/admin/create-draft", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        assessment_id: assessment.id,
+        participant_wallet: assessment.participant.wallet_address,
+        training_name: TRAINING_NAME,
+        training_field: TRAINING_FIELD,
+        status: "active",
+        metadata_uri: JSON.stringify(metadataPreview),
+        wallet_address: wallet,
+      }),
     });
+    const result = await res.json();
     setSaving(false);
-    if (error) {
-      toast.error(error.message);
+    if (!res.ok) {
+      toast.error(result.error);
       return;
     }
     toast.success("Draft sertifikat berhasil dibuat.");
