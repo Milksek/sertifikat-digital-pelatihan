@@ -35,6 +35,7 @@ async function checkOnChain(tokenId: string | null, participantWallet: string | 
   on_chain_owner: string | null;
   token_uri: string | null;
   error: string | null;
+  burned?: boolean;
 }> {
   const noContract = !CONTRACT_ADDRESS || CONTRACT_ADDRESS === "isi_alamat_kontrak_jika_sudah_ada";
   if (noContract || tokenId === null || tokenId === undefined || tokenId === "") {
