@@ -45,10 +45,49 @@ async function checkOnChain(tokenId: string | null, participantWallet: string | 
     const tokenIdBigInt = BigInt(tokenId);
     const contractAddr = CONTRACT_ADDRESS as `0x${string}`;
 
-    const [owner, uri] = await Promise.all([
-      viemClient.readContract({ address: contractAddr, abi: SBT_ABI, functionName: "ownerOf", args: [tokenIdBigInt] }),
-      viemClient.readContract({ address: contractAddr, abi: SBT_ABI, functionName: "tokenURI", args: [tokenIdBigInt] }).catch(() => null as string | null),
-    ]);
+    let owner: string | null = null;
+    let uri: string | null = null;
+    let isBurned = false;
+
+    try {
+      owner = await viemClient.readContract({
+        address: contractAddr,
+        abi: SBT_ABI,
+        functionName: "ownerOf",
+        args: [tokenIdBigInt],
+      }) as string;
+    } catch (e: any) {
+      const msg = e?.shortMessage || e?.message || "";
+      if (msg.includes("revert") || msg.includes("0x") || msg.includes("nonexistent token")) {
+        isBurned = true;
+      } else {
+        throw e;
+      }
+    }
+
+    if (!isBurned) {
+      try {
+        uri = await viemClient.readContract({
+          address: contractAddr,
+          abi: SBT_ABI,
+          functionName: "tokenURI",
+          args: [tokenIdBigInt],
+        }) as string;
+      } catch {
+        uri = null;
+      }
+    }
+
+    if (isBurned) {
+      return {
+        checked: true,
+        owner_match: false,
+        on_chain_owner: null,
+        token_uri: null,
+        error: "Token sudah dibakar (burned) di blockchain",
+        burned: true,
+      };
+    }
 
     const ownerLower = (owner as string).toLowerCase();
     const walletLower = (participantWallet || "").toLowerCase();
@@ -58,6 +97,7 @@ async function checkOnChain(tokenId: string | null, participantWallet: string | 
       on_chain_owner: ownerLower,
       token_uri: uri as string | null,
       error: null,
+      burned: false,
     };
   } catch (e: any) {
     return {
@@ -66,6 +106,7 @@ async function checkOnChain(tokenId: string | null, participantWallet: string | 
       on_chain_owner: null,
       token_uri: null,
       error: e?.shortMessage || e?.message || "Gagal query blockchain",
+      burned: false,
     };
   }
 }

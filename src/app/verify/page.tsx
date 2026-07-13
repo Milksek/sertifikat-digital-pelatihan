@@ -16,6 +16,7 @@ type OnChainResult = {
   token_uri: string | null;
   error: string | null;
   tx_hash?: string | null;
+  burned?: boolean;
 };
 
 type VerifyResult = {
@@ -68,6 +69,18 @@ function OnChainBadge({ onChain }: { onChain: OnChainResult | null }) {
         <div>
           <p className="text-sm font-semibold text-slate-900">Verifikasi on-chain belum tersedia</p>
           <p className="mt-1 text-sm leading-6 text-slate-600">{onChain.error || "Kontrak belum dikonfigurasi untuk pemeriksaan on-chain."}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (onChain.burned) {
+    return (
+      <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-4">
+        <ShieldX className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+        <div>
+          <p className="text-sm font-semibold text-red-800">Token sudah dibakar (burned)</p>
+          <p className="mt-1 text-sm leading-6 text-red-700">Token ini sudah di-burn di blockchain dan tidak lagi valid. Sertifikat telah dicabut secara permanen.</p>
         </div>
       </div>
     );
