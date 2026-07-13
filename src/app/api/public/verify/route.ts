@@ -58,8 +58,8 @@ async function checkOnChain(tokenId: string | null, participantWallet: string | 
         args: [tokenIdBigInt],
       }) as string;
     } catch (e: any) {
-      const msg = e?.shortMessage || e?.message || "";
-      if (msg.includes("revert") || msg.includes("0x") || msg.includes("nonexistent token")) {
+      const msg = (e?.shortMessage || e?.message || "").toLowerCase();
+      if (msg.includes("revert") || msg.includes("reverted") || msg.includes("0x") || msg.includes("nonexistent") || msg.includes("token does not exist")) {
         isBurned = true;
       } else {
         throw e;
@@ -121,6 +121,7 @@ async function findCertificateByTokenId(supabase: ReturnType<typeof getAdmin>, t
   const { data, error } = await supabase
     .from("sertifikat")
     .select(`
+      id,
       certificate_number,
       participant_wallet,
       token_id,
@@ -145,11 +146,25 @@ async function findCertificateByTokenId(supabase: ReturnType<typeof getAdmin>, t
   }
 
   const d = data as unknown as {
-    certificate_number: string; participant_wallet: string; token_id: string;
+    id: string; certificate_number: string; participant_wallet: string; token_id: string;
     tx_hash: string; ipfs_image_uri: string; metadata_uri: string; status: string;
     minted_at: string; revoked_at: string | null; revocation_reason: string | null;
     assessment?: { recommendation?: string; score?: unknown; participant?: { full_name?: string } } | null;
   };
+
+  const certId = d.id;
+  let burnTxHash = null;
+  if (d.status === "revoked") {
+    const { data: burnLog } = await supabase
+      .from("log_transaksi")
+      .select("tx_hash")
+      .eq("certificate_id", certId)
+      .eq("tx_type", "burn")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    burnTxHash = burnLog?.tx_hash ?? null;
+  }
 
   return {
     certificate_number: d.certificate_number,
@@ -158,6 +173,7 @@ async function findCertificateByTokenId(supabase: ReturnType<typeof getAdmin>, t
     participant_wallet: d.participant_wallet,
     token_id: d.token_id,
     tx_hash: d.tx_hash,
+    burn_tx_hash: burnTxHash,
     ipfs_image_uri: d.ipfs_image_uri,
     metadata_uri: d.metadata_uri,
     status: d.status,

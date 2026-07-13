@@ -26,6 +26,7 @@ type VerifyResult = {
   participant_wallet: string;
   token_id: string | null;
   tx_hash: string | null;
+  burn_tx_hash: string | null;
   ipfs_image_uri: string | null;
   metadata_uri: string | null;
   status: string;
@@ -341,7 +342,16 @@ export default function VerifyPage() {
                   <div className="mt-4">
                     <OnChainBadge onChain={result.on_chain} />
                   </div>
-                  {result.tx_hash && (
+                  {result.burn_tx_hash ? (
+                    <a
+                      href={`https://amoy.polygonscan.com/tx/${result.burn_tx_hash}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-4 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-blue-700 transition hover:bg-slate-50"
+                    >
+                      <ExternalLink className="h-4 w-4" /> Transaksi Pencabutan di PolygonScan
+                    </a>
+                  ) : result.tx_hash ? (
                     <a
                       href={`https://amoy.polygonscan.com/tx/${result.tx_hash}`}
                       target="_blank"
@@ -350,7 +360,7 @@ export default function VerifyPage() {
                     >
                       <ExternalLink className="h-4 w-4" /> Periksa transaksi di PolygonScan Amoy
                     </a>
-                  )}
+                  ) : null}
                 </div>
               </div>
             )}
