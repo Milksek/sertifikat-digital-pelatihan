@@ -13,6 +13,7 @@ import { appChain, client, hasThirdwebClient } from "@/lib/thirdweb";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { isAdminWallet } from "@/lib/admin-wallets";
 
 interface WalletContextType {
   walletAddress: string | null;
@@ -22,8 +23,6 @@ interface WalletContextType {
   connectWallet: () => Promise<void>;
   disconnectWallet: () => void;
 }
-
-const MASTER_WALLET = "0x1cb90a414ade635dcfa78e41a825c789edde4d8e";
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
 export const WalletProvider = ({ children }: { children: ReactNode }) => {
@@ -113,12 +112,12 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       toast.success("Login berhasil!", {
         description: `${address.slice(0, 6)}...${address.slice(-4)}`,
       });
-      const isAdminWallet = address === MASTER_WALLET || role === "admin";
-      if (isNewUser && !isAdminWallet) {
+      const isWalletAdmin = isAdminWallet(address) || role === "admin";
+      if (isNewUser && !isWalletAdmin) {
         router.push(`/login?register=1&userId=${userId}`);
         return;
       }
-      if (isAdminWallet) {
+      if (isWalletAdmin) {
         window.location.replace("/admin/dashboard");
         return;
       }

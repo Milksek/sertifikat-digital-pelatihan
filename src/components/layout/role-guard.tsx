@@ -6,13 +6,12 @@ import { Loader2 } from "lucide-react";
 
 import { useAuth, Role } from "@/components/providers/auth-provider";
 import { ProfileSettingsModal } from "@/components/profile-settings-modal";
+import { isAdminWallet } from "@/lib/admin-wallets";
 
 interface RoleGuardProps {
   children: React.ReactNode;
   allowedRoles: Role[];
 }
-
-const MASTER_WALLET = "0x1cb90a414ade635dcfa78e41a825c789edde4d8e";
 
 export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
   const { user, role, isLoading } = useAuth();
@@ -81,7 +80,7 @@ export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
   }
 
   const isProfileIncomplete =
-    effectiveUser.wallet_address?.toLowerCase() !== MASTER_WALLET &&
+    !isAdminWallet(effectiveUser.wallet_address) &&
     (!effectiveUser.full_name ||
       !effectiveUser.email ||
       !effectiveUser.phone ||

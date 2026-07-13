@@ -7,7 +7,7 @@ import {
   useDisconnect,
 } from "thirdweb/react";
 import { useRouter } from "next/navigation";
-const MASTER_WALLET = "0x1cb90a414ade635dcfa78e41a825c789edde4d8e";
+import { isAdminWallet } from "@/lib/admin-wallets";
 export type Role = "participant" | "assessor" | "admin" | null;
 interface UserProfile {
   id: string;
@@ -32,7 +32,7 @@ const AuthContext = createContext<AuthContextType>({
 });
 function normalizeProfile(profile: UserProfile | null): UserProfile | null {
   if (!profile) return null;
-  if (profile.wallet_address?.toLowerCase() === MASTER_WALLET) {
+  if (isAdminWallet(profile.wallet_address)) {
     return { ...profile, role: "admin" };
   }
   return profile;

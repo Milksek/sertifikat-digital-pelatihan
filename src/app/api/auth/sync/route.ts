@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { recoverAddress, hashMessage } from "viem";
+import { isAdminWallet } from "@/lib/admin-wallets";
 
 const NONCE_EXPIRY_SECONDS = 60;
-
-const MASTER_WALLET = (
-  process.env.MASTER_WALLET_ADDRESS ??
-  "0x1cb90a414ade635dcfa78e41a825c789edde4d8e"
-).toLowerCase();
 let _supabaseAdmin: ReturnType<typeof createClient> | null = null;
 let _supabaseAuth: ReturnType<typeof createClient> | null = null;
 
@@ -34,7 +30,7 @@ function getAuthClient() {
 }
 
 function normalizeRole(addr: string, role?: string | null) {
-  return addr === MASTER_WALLET ? "admin" : role ?? "participant";
+  return isAdminWallet(addr) ? "admin" : role ?? "participant";
 }
 
 async function findAuthUserByEmail(email: string) {
@@ -188,7 +184,7 @@ export async function POST(req: NextRequest) {
 
     if (signInResult.data.session?.access_token && signInResult.data.user) {
       userId = signInResult.data.user.id;
-      role = addr === MASTER_WALLET
+      role = isAdminWallet(addr)
         ? "admin"
         : existing?.role ?? bodyRole ?? "participant";
 
@@ -217,7 +213,7 @@ export async function POST(req: NextRequest) {
       );
 
       userId = ensuredAuthUser.id;
-      role = addr === MASTER_WALLET
+      role = isAdminWallet(addr)
         ? "admin"
         : bodyRole ?? existing?.role ?? "participant";
       const profilePayload: any = {
@@ -263,9 +259,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (bodyRole || fullName || bodyEmail || phone || nik || addr === MASTER_WALLET) {
+    if (bodyRole || fullName || bodyEmail || phone || nik || isAdminWallet(addr)) {
       const updatePayload: any = {};
-      if (addr === MASTER_WALLET) updatePayload.role = "admin";
+      if (isAdminWallet(addr)) updatePayload.role = "admin";
       else if (bodyRole) updatePayload.role = bodyRole;
       if (fullName) updatePayload.full_name = fullName;
       if (bodyEmail) updatePayload.email = bodyEmail;
@@ -288,7 +284,7 @@ export async function POST(req: NextRequest) {
       );
     }
     const accessToken = signInResult.data.session.access_token;
-    const isNewUser = addr !== MASTER_WALLET && !existing?.full_name;
+    const isNewUser = !isAdminWallet(addr) && !existing?.full_name;
     return NextResponse.json({
       success: true,
       isNewUser,

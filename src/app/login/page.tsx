@@ -19,7 +19,7 @@ import {
   ArrowRight,
   X,
 } from "lucide-react";
-const MASTER_WALLET = "0x1cb90a414ade635dcfa78e41a825c789edde4d8e";
+import { isAdminWallet } from "@/lib/admin-wallets";
 
 function RegisterPopup({
   walletAddress,
@@ -37,7 +37,7 @@ function RegisterPopup({
     email: "",
     phone: "",
     nik: "",
-    roleType: walletAddress === MASTER_WALLET ? "admin" : "participant",
+    roleType: isAdminWallet(walletAddress) ? "admin" : "participant",
   });
   const [saving, setSaving] = useState(false);
   const handleSubmit = async (e: React.FormEvent) => {
@@ -174,7 +174,7 @@ function RegisterPopup({
               </div>
             </div>
 
-            {walletAddress !== MASTER_WALLET && (
+            {!isAdminWallet(walletAddress) && (
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                 <Label className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Peran akun</Label>
                 <RadioGroup
@@ -255,12 +255,12 @@ function LoginContent() {
         const cached = localStorage.getItem("ssdp_profile");
         if (cached) {
           const profile = JSON.parse(cached);
-          const isAdminWallet = walletAddress?.toLowerCase() === MASTER_WALLET;
+          const isWalletAdmin = isAdminWallet(walletAddress);
           isProfileComplete = Boolean(
             profile?.full_name &&
             profile?.email &&
             profile?.phone &&
-            (isAdminWallet || (profile?.nik && String(profile.nik).length === 16)),
+            (isWalletAdmin || (profile?.nik && String(profile.nik).length === 16)),
           );
         }
       } catch {}
