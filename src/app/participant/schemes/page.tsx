@@ -142,7 +142,7 @@ export default function ParticipantTrainingPage() {
               <div className="space-y-4">
                 <p className="text-sm text-slate-600">Kamu belum mendaftar penilaian untuk pelatihan ini. Klik tombol di bawah untuk mendaftar.</p>
                 <Button onClick={handleRegister} disabled={submitting} className="w-full bg-emerald-600 hover:bg-emerald-700 font-semibold">
-                  {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Mendaftar...</> : <><GraduationCap className="mr-2 h-4 w-4" /> Daftar Penilaian</>}
+                  {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Mendaftar...</> : <><GraduationCap className="mr-2 h-4 w-4" /> Daftar Pelatihan</>}
                 </Button>
                 <p className="text-xs text-slate-400">Setelah mendaftar, sistem akan menugaskan asesor untuk mengevaluasi kompetensi kamu.</p>
               </div>
