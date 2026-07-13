@@ -36,8 +36,15 @@ export default function AdminRevocationsPage() {
 
   const handleRevoke = async (id: string) => {
     if (!reason.trim()) return toast.error("Masukkan alasan pencabutan.");
-    const { error } = await supabase.from("sertifikat").update({ status: "revoked", revoked_at: new Date().toISOString(), revocation_reason: reason }).eq("id", id);
-    if (error) return toast.error(error.message);
+    const profile = JSON.parse(localStorage.getItem("ssdp_profile") || "{}");
+    const wallet = profile.wallet_address;
+    const res = await fetch("/api/admin/revoke", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, reason, wallet_address: wallet }),
+    });
+    const result = await res.json();
+    if (!res.ok) return toast.error(result.error);
     toast.success("Sertifikat berhasil dicabut.");
     setRevoking(null);
     setReason("");
